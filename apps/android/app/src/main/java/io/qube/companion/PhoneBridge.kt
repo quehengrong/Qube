@@ -20,10 +20,12 @@ class PhoneBridge(private val app:QubeApp){
   val p=JSONObject(raw);require(p.getInt("version")==1){"配对版本不匹配"}
   val u=URI(p.getString("url"));require(u.scheme=="wss"&&u.host!=null&&u.path=="/bridge"){"无效配对地址"}
   require(p.getString("fingerprint").matches(Regex("[a-fA-F0-9]{64}"))&&p.getString("token").length>=32){"配对凭据不完整"}
-  app.prefs().edit().putString("pairing",raw).apply();connect()
+  app.prefs().edit().putString("pairing",raw).apply();connect(true)
  }
- @Synchronized fun connect(){
+ @Synchronized fun connect(force:Boolean=false){
+  if(!force&&app.ui.value.connected)return
   val raw=app.prefs().getString("pairing",null)?:return
+  app.ui.update{it.copy(connected=false,canSend=false,face="offline")}
   reconnect?.cancel();generation++;val current=generation;socket?.cancel();client?.dispatcher?.executorService?.shutdown()
   val p=JSONObject(raw);val host=URI(p.getString("url")).host
   val expected=p.getString("fingerprint").lowercase()

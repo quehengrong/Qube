@@ -16,6 +16,7 @@ for(const b of document.querySelectorAll('[data-command]'))b.onclick=safe(()=>ca
 $('launch').onsubmit=safe(async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.target));await call('launch-session',data);});
 $('draft').oninput=()=>{dirty=true;$('submit-draft').disabled=true;};
 $('save-draft').onclick=safe(async()=>{await call('draft-update',{text:$('draft').value,revision:editRevision});dirty=false;render(await call('state'));});
+$('reload-draft').onclick=safe(async()=>{dirty=false;render(await call('state'));});
 $('clear-draft').onclick=safe(async()=>{await call('draft-update',{text:'',revision:state.draft.revision});dirty=false;render(await call('state'));});
 $('submit-draft').onclick=safe(async()=>{await call('draft-submit',{id:crypto.randomUUID(),sessionId:state.draft.sessionId,revision:state.draft.revision});});
 $('close-session').onclick=safe(async()=>{if(selected&&confirm('结束此会话？未完成的 agent 工作将中断。'))await call('close-session',selected);});
