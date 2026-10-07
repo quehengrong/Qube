@@ -15,3 +15,4 @@ describe('draft safety',()=>{
 });
 it('only standalone confirm submits',()=>{expect(intent('确认发送').kind).toBe('submit');expect(intent('请发送一个请求到服务器').kind).toBe('unknown');});
 it('rejects malformed network messages',()=>{expect(ClientMessageSchema.safeParse({id,type:'audio',payload:{pcm:'x',sampleRate:44100}}).success).toBe(false);});
+it('preserves Chinese numerals in reminder content',()=>{const r=parseReminder('明天下午三点提醒我买三本书',now,id);expect(r.ok&&r.reminder.title).toBe('买三本书');});

@@ -30,7 +30,6 @@ class QubeApp:Application(){
   db=ReminderDb.open(this);alarms=ReminderScheduler(this,db);bridge=PhoneBridge(this)
   tts=TextToSpeech(this){status->if(status==TextToSpeech.SUCCESS){val engine=tts;val voice=engine?.voices?.firstOrNull{it.locale.language=="zh"&&!it.isNetworkConnectionRequired};if(voice!=null){engine.voice=voice;ttsReady=true}else{ui.update{it.copy(message="请在系统文字转语音设置中下载中文离线语音")}}}}
   tts?.setOnUtteranceProgressListener(object:UtteranceProgressListener(){override fun onStart(id:String?){speaking=true};override fun onDone(id:String?){speaking=false};@Deprecated("Legacy TTS") override fun onError(id:String?){speaking=false}})
-  scope.launch{alarms.restore()}
  }
  fun say(text:String){ui.update{it.copy(message=text)};if(ttsReady){speaking=true;tts?.speak(text,TextToSpeech.QUEUE_FLUSH,null,UUID.randomUUID().toString())}}
  fun error(text:String){ui.update{it.copy(face="error",message=text)};say(text)}

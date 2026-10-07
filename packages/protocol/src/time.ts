@@ -3,7 +3,7 @@ const digits:Record<string,number>={'零':0,'〇':0,'一':1,'二':2,'两':2,'三
 function number(s:string):number { if(/^\d+$/.test(s))return Number(s);if(s.includes('十')){const [a,b]=s.split('十');return (a?digits[a]:1)*10+(b?digits[b]:0);} return digits[s]??NaN; }
 export type TimeResult={ok:true;reminder:Reminder;summary:string}|{ok:false;question:string};
 export function parseReminder(input:string,now:number,id:string,defaultAdvance=10):TimeResult {
- let text=input.replace(/[零〇一二两三四五六七八九十]+/g,s=>String(number(s)));
+ let text=input.replace(/[零〇一二两三四五六七八九十]+(?=年|月|日|号|点|分|小时)/g,s=>String(number(s))).replace(/每周([一二三四五六])/g,(_,day)=>'每周'+number(day));
  const advance=text.match(/提前(\d+)分钟/); const advanceMinutes=advance?Number(advance[1]):defaultAdvance;
  if(advanceMinutes>10080)return {ok:false,question:'提前量最多为七天，请重新指定。'};
  text=text.replace(/提前\d+分钟(?:提醒我?)?/g,'');

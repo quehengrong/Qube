@@ -24,7 +24,7 @@ def download(url, target, checksum=None):
 if __name__ == "__main__":
     download(AAR, APP / "libs/sherpa-onnx-1.13.8.aar", "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96")
     cache = Path(tempfile.gettempdir()) / "qube-downloads/kws.tar.bz2"
-    download(MODEL, cache)
+    download(MODEL, cache, "68447f4fbc67e70eee3a93961f36e81e98f47aef73ce7e7ca00885c6cd3616a6")
     out = APP / "src/main/assets/kws"
     out.mkdir(parents=True, exist_ok=True)
     with tarfile.open(cache) as archive:
