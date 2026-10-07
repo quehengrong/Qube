@@ -12,7 +12,7 @@ export class Sessions extends EventEmitter {
  launch(input:unknown){
   if(process.platform!=='win32')throw new Error('CLI 托管需要 Windows 11，请在目标电脑启动 Qube');
   const c=LaunchSchema.parse(input);let executable:string,args:string[],cwd:string|undefined;
-  if(c.environment==='wsl'){executable='wsl.exe';args=[...(c.distribution?['--distribution',c.distribution]:[]),'--cd',c.cwd,'--exec',c.agent];}
+  if(c.environment==='wsl'){executable='wsl.exe';args=[...(c.distribution?['--distribution',c.distribution]:[]),'--cd',c.cwd,'--exec','bash','-lic',`exec ${c.agent}`];}
   else{executable='powershell.exe';args=['-NoLogo','-NoProfile','-Command',`& ${c.agent}; exit $LASTEXITCODE`];cwd=c.cwd;}
   const native=require('node-pty') as typeof pty;
   const id=randomUUID();const child=native.spawn(executable,args,{name:'xterm-256color',cols:100,rows:28,cwd,env:process.env as Record<string,string>});
@@ -22,7 +22,7 @@ export class Sessions extends EventEmitter {
  }
  output(id:string){return this.all.get(id)?.output??'';}
  input(id:string,data:string){const s=this.all.get(id);if(!s?.info.alive)throw new Error('会话已结束，请重新启动并选择目标');s.pty.write(data);}
- resize(id:string,cols:number,rows:number){this.all.get(id)?.pty.resize(Math.max(20,Math.min(300,cols)),Math.max(5,Math.min(100,rows)));}
+ resize(id:string,cols:number,rows:number){const s=this.all.get(id);if(s?.info.alive)s.pty.resize(Math.max(20,Math.min(300,cols)),Math.max(5,Math.min(100,rows)));}
  async submit(id:string,text:string){
   if(/[\x00-\x08\x0b-\x1f\x7f]/.test(text.replace(/\r/g,'')))throw new Error('草稿含不允许的终端控制字符');
   this.input(id,`\x1b[200~${text.replace(/\r\n/g,'\n').replace(/\r/g,'\n')}\x1b[201~`);

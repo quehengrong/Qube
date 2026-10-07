@@ -52,6 +52,7 @@ class MainActivity:ComponentActivity(){
     Text("Qube",color=MaterialTheme.colorScheme.primary,fontSize=24.sp,modifier=Modifier.padding(8.dp))
     Row{for((page,label) in listOf("eyes" to "眼睛","coding" to "听写","reminders" to "提醒","settings" to "设置")){TextButton(onClick={app.ui.update{it.copy(page=page)}}){Text(label)}}}
    }
+   if(state.face=="error")Text(state.message,color=MaterialTheme.colorScheme.error,modifier=Modifier.padding(horizontal=18.dp),maxLines=2)
    Box(Modifier.weight(1f)){
     when(state.page){
      "eyes"->Eyes(state)

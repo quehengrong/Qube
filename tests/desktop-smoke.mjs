@@ -13,9 +13,9 @@ try {
  await page.locator('[data-tab="settings"]').click();await expect(page.locator('#config')).toHaveValue(/pythonPath/);
  await page.locator('[data-tab="pairing"]').click();await expect(page.locator('#pairings img').first()).toBeVisible();
  await page.locator('[data-tab="home"]').click();
- await page.locator('#command').fill('明天下午三点提醒我开会');await page.locator('#command-form button').click();
- await expect(page.locator('#toast')).toContainText('连接手机');
  mkdirSync('docs/screenshots',{recursive:true});
  await page.screenshot({path:'docs/screenshots/desktop.png',fullPage:true});
+ await page.locator('#command').fill('明天下午三点提醒我开会');await page.locator('#command-form button').click();
+ await expect(page.locator('#toast')).toContainText('连接手机');
  expect(errors).toEqual([]);console.log('Desktop smoke passed: navigation, pairing QR, disabled submission, offline reminder failure, no renderer errors');
 } finally {if(app)await app.close();rmSync(profile,{recursive:true,force:true});}

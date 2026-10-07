@@ -31,7 +31,7 @@ Windows 防火墙只需在专用网络允许 TCP 19431。企业 Wi-Fi 的客户�
 
 先在 WSL 或 PowerShell 安装并登录 Codex / Claude。Qube 不管理 agent 的账号和授权。
 
-在电脑 Qube 的“编程听写”中选择环境、agent 和实际项目目录，启动会话；WSL 目录填写 Linux 路径，可填写发行版名称。程序通过 `wsl.exe --cd <目录> --exec codex|claude` 启动；若使用 nvm 等交互 Shell 初始化，请确保 CLI 在 WSL 的默认进程 PATH 中可发现。
+在电脑 Qube 的“编程听写”中选择环境、agent 和实际项目目录，启动会话；WSL 目录填写 Linux 路径，可填写发行版名称。程序通过 WSL 的交互登录 Bash 启动固定的 `exec codex` 或 `exec claude`，以加载常见 nvm/PATH 配置；请确保在该 Bash 环境中能运行对应命令。工作目录作为独立参数传入，不拼接到 Shell 命令中。
 
 选中目标会话，说“进入编程听写”。说完需求后，检查手机或电脑草稿；编辑后点“保存修改”。确认 agent 正在输入提示符，再点“确认发送”，或唤醒后单独说“确认发送”。听写正文不会作为电脑操作执行。
 

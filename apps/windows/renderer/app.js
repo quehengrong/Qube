@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id),api=window.qube;let state=null,selected=null,dirty=false,editRevision=null;let timer;
 function toast(text,error=false){$('toast').textContent=text;$('toast').className=error?'error':'';clearTimeout(timer);timer=setTimeout(()=>$('toast').className='hidden',6000);}
-async function call(name,arg){try{return await api.invoke(name,arg);}catch(e){toast(e.message,true);throw e;}}
+async function call(name,arg){try{return await api.invoke(name,arg);}catch(e){toast(e.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''),true);throw e;}}
 function safe(action){return (...args)=>Promise.resolve().then(()=>action(...args)).catch(()=>{});}
 const term=new Terminal({theme:{background:'#131e29',foreground:'#d5e6ed',cursor:'#73edd0'},fontSize:13,fontFamily:'Consolas, monospace',scrollback:3000});const fit=new FitAddon.FitAddon();term.loadAddon(fit);term.open($('terminal'));
 term.onData(data=>{if(selected)call('terminal-input',{id:selected,data}).catch(()=>{});});

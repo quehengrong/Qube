@@ -39,6 +39,9 @@ jobs:
       - run: npm run dist:win
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: node tests/desktop-smoke.mjs
+        env:
+          QUBE_ELECTRON_BINARY: '${{ github.workspace }}\apps\windows\release\win-unpacked\Qube.exe'
       - uses: actions/upload-artifact@v4
         with:
           name: Qube-Windows-x64-preview

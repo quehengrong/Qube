@@ -31,7 +31,7 @@ class ReminderSpeaker : Service() {
   tts=TextToSpeech(this){status->
    val engine=tts
    val voice=if(status==TextToSpeech.SUCCESS)engine?.voices?.firstOrNull{it.locale.language=="zh"&&!it.isNetworkConnectionRequired}else null
-   if(voice!=null){engine.voice=voice;engine.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build());ready=true}else unavailable=true
+   if(engine!=null&&voice!=null){engine.voice=voice;engine.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build());ready=true}else unavailable=true
    next()
   }
   tts?.setOnUtteranceProgressListener(object:UtteranceProgressListener(){
