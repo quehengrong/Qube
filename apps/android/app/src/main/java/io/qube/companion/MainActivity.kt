@@ -35,6 +35,8 @@ import java.util.UUID
 
 class MainActivity:ComponentActivity(){
  private val app get()=application as QubeApp
+ private val exportBackup=registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->uri?.let{app.scope.launch{try{val text=Backup.export(app);contentResolver.openOutputStream(it)?.bufferedWriter()?.use{out->out.write(text)}?:error("无法写入备份");app.say("备份已导出")}catch(e:Exception){app.error(e.message?:"导出失败")}}}}
+ private val importBackup=registerForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{app.scope.launch{try{val text=contentResolver.openInputStream(it)?.bufferedReader()?.use{reader->val chars=CharArray(2_000_001);var total=0;while(total<chars.size){val n=reader.read(chars,total,chars.size-total);if(n<0)break;total+=n};require(total<=2_000_000);String(chars,0,total)}?:error("无法读取备份");Backup.restore(app,text);app.say("备份已合并，原有数据保留")}catch(e:Exception){app.error(e.message?:"导入失败")}}}}
  private var pendingListen=false
  private val permissions=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED)startVoice(pendingListen)else app.error("需要麦克风权限才能语音唤醒")}
  private val scan=registerForActivityResult(ScanContract()){result->result.contents?.let{raw->try{app.bridge.pair(raw)}catch(e:Exception){app.error(e.message?:"二维码无效")}}}
@@ -94,6 +96,7 @@ class MainActivity:ComponentActivity(){
   var mute by remember{mutableStateOf(false)};var bright by remember{mutableFloatStateOf(.5f)};var keep by remember{mutableStateOf(true)}
   Column(Modifier.fillMaxSize().padding(18.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
    ProfileSettings(app,state)
+   Row{TextButton(onClick={exportBackup.launch("Qube-backup.json")}){Text("导出本地数据")};TextButton(onClick={importBackup.launch(arrayOf("application/json"))}){Text("导入备份（保留现有数据）")}}
    Text("连接与语音",fontSize=22.sp)
    Row{Button(onClick={scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("扫描电脑 Qube 的配对二维码").setBeepEnabled(false).setOrientationLocked(false))}){Text("扫描配对")};TextButton(onClick={app.bridge.connect(true)}){Text("重新连接")};Button(onClick={startVoice()}){Text("开启唤醒词监听")}}
    OutlinedTextField(value=pairing,onValueChange={pairing=it},label={Text("也可粘贴电脑复制的配对数据")},modifier=Modifier.fillMaxWidth())

@@ -8,6 +8,18 @@ android {
  namespace = "io.qube.companion"
  compileSdk = 35
  defaultConfig { applicationId = "io.qube.companion"; minSdk = 26; targetSdk = 35; versionCode = 2; versionName = "0.2.0"; ndk { abiFilters += "arm64-v8a" } }
+ signingConfigs {
+  if (System.getenv("QUBE_ANDROID_KEYSTORE") != null) {
+   create("qubeRelease") {
+    storeFile = file(System.getenv("QUBE_ANDROID_KEYSTORE"))
+    storeType = "PKCS12"
+    storePassword = System.getenv("QUBE_ANDROID_STORE_PASSWORD")
+    keyAlias = "qube"
+    keyPassword = System.getenv("QUBE_ANDROID_STORE_PASSWORD")
+   }
+  }
+ }
+ buildTypes { getByName("release") { signingConfig = signingConfigs.findByName("qubeRelease") } }
  buildFeatures { compose = true; buildConfig = true }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }

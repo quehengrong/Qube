@@ -44,19 +44,19 @@ class QubeApp:Application(){
  fun setQuiet(value:Boolean){prefs().edit().putBoolean("quiet",value).apply();ui.update{it.copy(quiet=value,message=if(value)"安静模式已开启" else "安静模式已关闭")};handler.post{if(value&&active?.category !in listOf("important","timer")){tts?.stop();finishSpeech(active?.id)}}}
  fun voices():List<String> = tts?.voices?.filter{it.locale.language=="zh"&&!it.isNetworkConnectionRequired}?.map{it.name}?.sorted()?:emptyList()
  fun say(text:String,category:String="normal",done:()->Unit={}){ui.update{it.copy(message=text)};handler.post{
-  if(quietNow()&&category !in listOf("important","timer","preview")){done();return@post}
+  if(!CompanionRules.audible(quietNow(),category)){done();return@post}
   val item=SpeechItem(UUID.randomUUID().toString(),text,category,done)
   if(category in listOf("important","timer")){speechQueue.addFirst(item);if(active!=null&&active!!.category !in listOf("important","timer")){tts?.stop();finishSpeech(active?.id)}}else speechQueue.add(item)
   nextSpeech()
  }}
- private fun nextSpeech(){if(active!=null||!ttsInitialized)return;val item=speechQueue.poll()?:return;if(!ttsReady||quietNow()&&item.category !in listOf("important","timer","preview")){item.done();nextSpeech();return};active=item;speaking=true
+ private fun nextSpeech(){if(active!=null||!ttsInitialized)return;val item=speechQueue.poll()?:return;if(!ttsReady||!CompanionRules.audible(quietNow(),item.category)){item.done();nextSpeech();return};active=item;speaking=true
   val voice=prefs().getString("voice","");tts?.voices?.firstOrNull{it.name==voice}?.let{tts?.voice=it};tts?.setSpeechRate(prefs().getFloat("speed",1f))
   val audio=getSystemService(android.media.AudioManager::class.java);if(audio.ringerMode!=android.media.AudioManager.RINGER_MODE_NORMAL){finishSpeech(item.id);return}
   tts?.setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
   val options=android.os.Bundle().apply{putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME,prefs().getFloat("volume",.8f))};if(tts?.speak(item.text,TextToSpeech.QUEUE_FLUSH,options,item.id)==TextToSpeech.ERROR)finishSpeech(item.id)
   handler.postDelayed({finishSpeech(item.id)},30000)
  }
- private fun finishSpeech(id:String?){val item=active?:return;if(item.id!=id)return;active=null;speaking=false;item.done();nextSpeech()}
+ private fun finishSpeech(id:String?){val item=active?:return;if(item.id!=id)return;tts?.stop();active=null;speaking=false;item.done();nextSpeech()}
  fun notice(id:String,text:String,category:String){val nm=getSystemService(NotificationManager::class.java);val open=PendingIntent.getActivity(this,0,android.content.Intent(this,MainActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE);nm.notify(id.hashCode(),Notification.Builder(this,if(quietNow()&&category !in listOf("important","timer"))"silent" else "reminders-v2").setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Qube").setContentText(text).setContentIntent(open).setAutoCancel(true).build());say(text,category)}
  fun error(text:String){ui.update{it.copy(face="error",message=text)};say(text)}
  fun prefs()=getSharedPreferences("qube",Context.MODE_PRIVATE)

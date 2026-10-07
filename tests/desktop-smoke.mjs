@@ -10,6 +10,18 @@ try {
  const page=await app.firstWindow();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await expect(page.locator('#heading')).toHaveText('你的桌面，多了一个伙伴。');
  await page.locator('[data-tab="coding"]').click();await expect(page.locator('#submit-draft')).toBeDisabled();
+ await page.locator('[data-tab="companion"]').click();
+ await page.locator('#project-form [name="name"]').fill('Smoke project');
+ await page.locator('#project-form [name="cwd"]').fill('/tmp/qube');
+ await page.locator('#project-form button').click();
+ await expect(page.locator('#project-list')).toHaveValue('Smoke project');
+ await page.locator('[data-tab="coding"]').click();
+ await expect(page.locator('#launch [name="enhanced"]')).toBeChecked();
+ await page.locator('#draft').fill('JavaScript');await page.locator('#save-draft').click();
+ await page.locator('#draft').fill('TypeScript');await page.locator('#save-draft').click();
+ await page.locator('[data-feature="undo"]').click();await expect(page.locator('#draft')).toHaveValue('JavaScript');
+ await page.locator('[data-feature="redo"]').click();await expect(page.locator('#draft')).toHaveValue('TypeScript');
+ await expect(page.locator('#submit-draft')).toBeDisabled();
  await page.locator('[data-tab="settings"]').click();await expect(page.locator('#config')).toHaveValue(/pythonPath/);
  await page.locator('[data-tab="pairing"]').click();await expect(page.locator('#pairings img').first()).toBeVisible();
  await page.locator('[data-tab="home"]').click();

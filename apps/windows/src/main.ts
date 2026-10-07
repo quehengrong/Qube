@@ -30,6 +30,8 @@ function publish(){const s=state();win?.webContents.send('state',s);bridge?.broa
 function feedback(message:string,error=false,id:string=randomUUID()){lastMessage=message;face=error?'error':'success';store?.event('操作反馈',error?'failed':'success',message,draft.state.sessionId??'',id);bridge?.broadcast({id,type:error?'error':'result',payload:{message}});publish();}
 async function textCommand(text:string,id:string){
  const assistant=text.startsWith('助手，')||text.startsWith('助手,');if(assistant)text=text.slice(3);
+ if(text==='确认修改'){await feature({action:'apply-rewrite'},id);return;}if(text==='取消修改'){rewrite=null;publish();return;}
+ if(draft.state.mode==='dictation'&&text==='把最后一句删掉'){rewrite={before:draft.state.text,text:draft.state.text.trimEnd().replace(/[^。！？.!?\n]+[。！？.!?]?$/u,'').trimEnd(),revision:draft.state.revision,sessionId:draft.state.sessionId};lastMessage='删除预览已准备，可以说“确认修改”或“取消修改”';publish();return;}
  if(draft.state.mode==='dictation'&&!assistant&&draft.edit(text)){lastMessage='草稿已修改，可撤销';publish();return;}
  if((draft.state.mode==='command'||assistant||/^(截一下|截图|把这段整理|把这段加入草稿|解释这段|翻译一下)/.test(text))&&await enhancedCommand(text,id))return;
  const parsed=intent(text);if(parsed.kind==='mode'){draft.state.mode=parsed.mode;feedback(parsed.mode==='dictation'?'已进入编程听写，请先选择目标会话':'已回到电脑控制模式');return;}
@@ -40,8 +42,8 @@ async function textCommand(text:string,id:string){
  }
  if(parsed.kind==='reminder'){
   if(!bridge.connected)throw Error('请先连接手机，提醒由手机保存');
-  const result=parseReminder(text,Date.now(),randomUUID(),config.defaultAdvance);if(!result.ok)throw Error(result.question);
-  pendingReminders.add(id);bridge.broadcast({id,type:'reminder-proposal',payload:{reminder:result.reminder,summary:result.summary}});lastMessage='等待手机确认提醒';publish();return;
+  const result=parseReminder(text.replace('重要提醒','提醒'),Date.now(),randomUUID(),config.defaultAdvance);if(!result.ok)throw Error(result.question);
+  result.reminder.important=text.includes('重要提醒');pendingReminders.add(id);bridge.broadcast({id,type:'reminder-proposal',payload:{reminder:result.reminder,summary:result.summary}});lastMessage='等待手机确认提醒';publish();return;
  }
  if(parsed.kind==='reminders'){bridge.broadcast({id,type:'reminder-action',payload:{action:'list'}});return;}
  if(parsed.kind==='unknown'||parsed.kind==='cancel'||parsed.kind==='submit'||parsed.kind==='clear')throw Error('未识别指令。可以说：打开软件、播放每日推荐、进入编程听写，或明天下午三点提醒我开会。');
@@ -52,10 +54,10 @@ async function submit(id:string,sessionId:string,revision:number){const sent=awa
 async function message(m:ClientMessage){
  try{switch(m.type){
   case 'phone-events':store.merge(m.payload.events);publish();break;
-  case 'wake':await capture.foreground().catch(()=>{});break;
+  case 'wake':await capture.foreground(true).catch(()=>{});break;
   case 'feature':await feature(m.payload,m.id);if(m.payload.action==='note-task')bridge.broadcast({id:m.id,type:'result',payload:{message:'灵感已加入草稿，确认后发送'}});break;
   case 'local-result':{const p=localPending.get(m.id);if(p){clearTimeout(p.timer);localPending.delete(m.id);store.event('手机操作',m.payload.ok?'success':'failed',m.payload.message,'phone',m.id);m.payload.ok?p.resolve(m.payload.message):p.reject(Error(m.payload.message));}break;}
-  case 'audio':{face='thinking';publish();const text=await speech.transcribe(m.payload.pcm);if(!text.trim())throw Error('没有识别到语音，请重试');bridge.broadcast({id:m.id,type:'transcript',payload:{text}});await textCommand(text,m.id);break;}
+  case 'audio':{face='thinking';publish();const text=await speech.transcribe(m.payload.pcm);if(!text.trim())throw Error('没有识别到语音，请重试');bridge.broadcast({id:m.id,type:'transcript',payload:{text}});try{await textCommand(text,m.id);}finally{capture.target=null;}break;}
   case 'text':await textCommand(m.payload.text,m.id);break;
   case 'select-session':select(m.payload.sessionId);break;
   case 'draft-update':draft.update(m.payload.text,m.payload.revision);publish();break;
@@ -93,12 +95,12 @@ async function feature(raw:any,id:string){
   case 'wake-config':{const phrase=p.text??'';if(!/^[\u4e00-\u9fff]{2,6}$/.test(phrase))throw Error('唤醒词请输入 2～6 个汉字');const url=await speech.keywords(phrase);bridge.broadcast({id,type:'wake-config',payload:url});lastMessage='请在手机试唤醒，确认后保存';break;}
   default:throw Error('不支持的增强操作');
  }
- if(!['metrics','history','clear-history'].includes(p.action))store.event(p.action,'success',lastMessage,draft.state.sessionId??'',id);publish();
+ if(!['metrics','history','clear-history','scene','scene-retry'].includes(p.action))store.event(p.action,'success',lastMessage,draft.state.sessionId??'',id);publish();
 }
 async function runScene(name:string,id:string){
  if(name==='我要休息'){await scenes.run(id,name,[{name:'暂停音乐',required:false,run:()=>control({kind:'music',action:'pause'},config,nativePath())},{name:'休息五分钟',required:true,run:()=>local('focus-start',{minutes:5,kind:'rest'})}]);}
  else if(name==='开始专注'){await scenes.run(id,name,[{name:'专注四十五分钟',required:true,run:()=>local('focus-start',{minutes:45,kind:'focus'})}]);}
- else{const project=config.projects.find(p=>p.name===config.activeProject)??config.projects[0];if(!project)throw Error('请先在场景设置中配置项目');await scenes.run(id,name,[{name:'打开编辑器',required:!!project.editor,run:async()=>{if(project.editor)return control({kind:'open',name:project.editor},config,nativePath());return '未配置编辑器';}},{name:'选择项目会话',required:true,run:async()=>{const match=sessions.list().find(s=>s.alive&&s.cwd===project.cwd&&s.agent===project.agent&&s.environment===project.environment&&(s.distribution??'')===project.distribution);select((match??await sessions.launch(project)).id);}},{name:'播放歌单',required:false,run:()=>control(project.playlist?{kind:'music',action:'playlist',name:project.playlist}:{kind:'music',action:'daily'},config,nativePath())}]);}
+ else{const project=config.projects.find(p=>p.name===config.activeProject)??config.projects[0];if(!project)throw Error('请先在场景设置中配置项目');await scenes.run(id,name,[{name:'打开编辑器',required:!!project.editor,run:async()=>{if(project.editor){const editor=config.applications[project.editor];if(!editor)throw Error('请先配置编辑器软件别名');const args=editor.args.map(a=>a.replaceAll('{project}',project.cwd).replaceAll('{distribution}',project.distribution));return control({kind:'open',name:project.editor},{...config,applications:{...config.applications,[project.editor]:{...editor,args}}},nativePath());}return '未配置编辑器';}},{name:'选择项目会话',required:true,run:async()=>{const match=sessions.list().find(s=>s.alive&&s.cwd===project.cwd&&s.agent===project.agent&&s.environment===project.environment&&(s.distribution??'')===project.distribution);select((match??await sessions.launch(project)).id);}},{name:'播放歌单',required:false,run:()=>control(project.playlist?{kind:'music',action:'playlist',name:project.playlist}:{kind:'music',action:'daily'},config,nativePath())}]);}
  store.event('工作场景',scenes.current!.status,name,'',id);lastMessage=`${name}：${scenes.current!.status}`;publish();
 }
 async function enhancedCommand(text:string,id:string):Promise<boolean>{
@@ -150,7 +152,7 @@ async function start(){dir=app.getPath('userData');config=loadConfig(dir);store=
  tray=new Tray(icon);tray.setToolTip('Qube');tray.setContextMenu(Menu.buildFromTemplate([{label:'打开 Qube',click:()=>win.show()},{label:'退出',click:()=>app.quit()}]));tray.on('double-click',()=>win.show());
  await win.loadFile(join(base,'renderer','index.html'));
  try{await bridge.start();}catch(e){feedback(`连接服务启动失败：${String(e)}`,true);}
- speech.start(config.pythonPath,speechDir());if(process.platform==='win32')setInterval(()=>capture.foreground().catch(()=>{}),1000).unref();publish();
+ capture.prune(JSON.stringify(draft.export()));setInterval(()=>capture.prune(JSON.stringify(draft.export())),3600000).unref();speech.start(config.pythonPath,speechDir());if(process.platform==='win32')setInterval(()=>capture.foreground().catch(()=>{}),1000).unref();publish();
 }
 app.on('before-quit',()=>{quitting=true;helperAgent.cancel();sessions.dispose();speech.stop();bridge?.stop();});
 if(single)app.whenReady().then(start).catch(e=>{console.error('Qube startup failed:',e.message);app.exit(1);});

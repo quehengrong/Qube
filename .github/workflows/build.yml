@@ -62,9 +62,23 @@ jobs:
         with:
           gradle-version: '8.11.1'
       - run: python3 scripts/fetch-android-assets.py
-      - run: gradle -p apps/android testDebugUnitTest assembleDebug lintDebug --no-daemon
+      - name: Restore stable Android release signing
+        env:
+          QUBE_ANDROID_KEYSTORE_BASE64: ${{ secrets.QUBE_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          python3 - <<'PYCODE'
+          import os,base64,pathlib
+          value=os.environ['QUBE_ANDROID_KEYSTORE_BASE64']
+          if not value: raise RuntimeError('Configure QUBE_ANDROID_KEYSTORE_BASE64 before producing installable releases')
+          path=pathlib.Path(os.environ['RUNNER_TEMP'])/'qube-release.p12'
+          path.write_bytes(base64.b64decode(value));path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('QUBE_ANDROID_KEYSTORE='+str(path)+'\n')
+          PYCODE
+      - run: gradle -p apps/android testReleaseUnitTest assembleRelease lintRelease --no-daemon
+        env:
+          QUBE_ANDROID_STORE_PASSWORD: ${{ secrets.QUBE_ANDROID_STORE_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
           name: Qube-Android-arm64-preview
-          path: apps/android/app/build/outputs/apk/debug/*.apk
+          path: apps/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error

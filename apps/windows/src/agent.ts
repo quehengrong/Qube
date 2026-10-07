@@ -7,9 +7,9 @@ export function command(c:Pick<SessionInfo,'environment'|'cwd'|'distribution'>,e
 export class CodexAgent extends EventEmitter {
  private child:ChildProcessWithoutNullStreams;private next=0;private pending=new Map<number,{resolve:(x:any)=>void;reject:(e:Error)=>void;timer:NodeJS.Timeout}>();
  thread='';turn='';requests=new Map<string,{id:any;method:string;params:any}>();ready:Promise<void>;private closed=false;
- constructor(c:SessionInfo,helper=false){super();const cmd=command(c,'codex',['app-server',...(helper?['-c','features.shell_tool=false','-c','features.apply_patch_freeform=false','-c','mcp_servers={}']:[])]);this.child=spawn(cmd.exe,cmd.args,{cwd:cmd.cwd,windowsHide:true,stdio:'pipe'});
+ constructor(c:SessionInfo,helper=false,transport?:ChildProcessWithoutNullStreams){super();const cmd=command(c,'codex',['app-server',...(helper?['-c','web_search="disabled"','-c','features.shell_tool=false','-c','features.apply_patch_freeform=false','-c','mcp_servers={}']:[])]);this.child=transport??spawn(cmd.exe,cmd.args,{cwd:cmd.cwd,windowsHide:true,stdio:'pipe'});
   const lines=createInterface({input:this.child.stdout});lines.on('line',line=>{try{this.receive(JSON.parse(line));}catch(e){this.emit('diagnostic',String(e));}});
-  this.child.stderr.on('data',b=>this.emit('output',b.toString()));this.child.on('error',e=>this.end(e));this.child.on('exit',()=>this.end(Error('Codex 服务已退出')));
+  this.child.stderr.on('data',b=>this.emit('diagnostic',b.toString()));this.child.on('error',e=>this.end(e));this.child.on('exit',()=>this.end(Error('Codex 服务已退出')));
   this.ready=this.initialize(c,helper);this.ready.catch(e=>{this.emit('status','failed',e.message);this.close();});
  }
  private end(e:Error){if(this.closed)return;this.closed=true;for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(e);}this.pending.clear();this.emit('exit');}
@@ -29,6 +29,7 @@ export class CodexAgent extends EventEmitter {
  }
  async submit(text:string,attachments:Attachment[]){await this.ready;if(this.turn||this.requests.size)throw Error('Agent 正在工作或等待处理，请先完成当前轮次');const r=await this.request('turn/start',{threadId:this.thread,input:[...(text?[{type:'text',text}]:[]),...attachments.map(a=>({type:'localImage',path:a.path}))]});this.turn=r.turn.id;this.emit('status','running','任务已接收');}
  respond(key:string,answer:any){const req=this.requests.get(key);if(!req)throw Error('此请求已结束');let result:any;if(req.method==='item/commandExecution/requestApproval'||req.method==='item/fileChange/requestApproval'){if(!['accept','decline'].includes(answer))throw Error('无效授权选择');result={decision:answer};}else if(req.method==='item/tool/requestUserInput'){if(!answer||typeof answer!=='object'||!answer.answers)throw Error('请填写问题回答');result=answer;}else{if(answer!=='decline')throw Error('此授权类型尚不支持，请拒绝并在 CLI 操作');this.send({id:req.id,error:{code:-32601,message:'Unsupported interactive request'}});this.requests.delete(key);this.emit('requests');return;}this.send({id:req.id,result});this.requests.delete(key);this.emit('requests');this.emit('status','running','已回复');}
+ reject(key:string){const r=this.requests.get(key);if(r){this.send({id:r.id,error:{code:-32601,message:'Interactive tools are disabled in Qube helper sessions'}});this.requests.delete(key);}}
  async interrupt(){if(this.turn)await this.request('turn/interrupt',{threadId:this.thread,turnId:this.turn});}
  close(){this.child.kill();}
 }

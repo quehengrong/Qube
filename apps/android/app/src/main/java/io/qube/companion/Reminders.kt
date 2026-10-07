@@ -17,6 +17,7 @@ data class Reminder(@PrimaryKey val id:String=UUID.randomUUID().toString(),val t
  companion object {fun fromJson(j:JSONObject)=Reminder(id=j.getString("id"),title=j.getString("title"),dueAt=j.getLong("dueAt"),advanceMinutes=j.getInt("advanceMinutes"),repeat=j.getString("repeat"),zone=j.getString("zone"),status=j.getString("status"),revision=j.getInt("revision"),important=j.optBoolean("important"))}
 }
 @Dao interface ReminderDao {
+ @Query("SELECT * FROM reminders") suspend fun all():List<Reminder>
  @Query("SELECT * FROM reminders ORDER BY dueAt") fun watch():Flow<List<Reminder>>
  @Query("SELECT * FROM reminders WHERE status='active'") suspend fun active():List<Reminder>
  @Query("SELECT * FROM reminders WHERE id=:id") suspend fun get(id:String):Reminder?
