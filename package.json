@@ -1,6 +1,11 @@
 {
-  "name": "qube", "version": "0.1.0", "private": true,
-  "workspaces": ["apps/windows", "packages/protocol"],
+  "name": "qube",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/windows",
+    "packages/protocol"
+  ],
   "scripts": {
     "build": "npm run build -w @qube/protocol && npm run build -w @qube/windows",
     "test": "vitest run",
@@ -8,5 +13,9 @@
     "dev": "npm run build && npm run start -w @qube/windows",
     "dist:win": "npm run build && npm run dist -w @qube/windows"
   },
-  "devDependencies": {"typescript": "~5.9.3", "vitest": "^3.2.4", "@types/node": "^22.19.0"}
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.11"
+  }
 }
