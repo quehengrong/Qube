@@ -42,6 +42,7 @@ class VoiceService:Service(){
    val config=KeywordSpotterConfig(modelConfig=OnlineModelConfig(transducer=OnlineTransducerModelConfig(encoder="$dir/encoder.onnx",decoder="$dir/decoder.onnx",joiner="$dir/joiner.onnx"),tokens="$dir/tokens.txt",numThreads=2,modelType="zipformer2"),keywordsFile="kws/keywords.txt")
    kws=KeywordSpotter(assets,config);stream=kws.createStream(tokens);require(stream.ptr!=0L){"唤醒词无效"}
    val size=AudioRecord.getMinBufferSize(16000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(6400)
+   if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED)throw SecurityException("麦克风权限已撤销")
    recorder=AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION,16000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT,size)
    check(recorder?.state==AudioRecord.STATE_INITIALIZED){"麦克风无法初始化"};recorder!!.startRecording()
    val buffer=ShortArray(1600);var capture:ByteArrayOutputStream?=null;var elapsed=0;var silence=0;var speech=false;var suppressUntil=0L

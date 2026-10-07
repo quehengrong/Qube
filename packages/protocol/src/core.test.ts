@@ -16,3 +16,9 @@ describe('draft safety',()=>{
 it('only standalone confirm submits',()=>{expect(intent('确认发送').kind).toBe('submit');expect(intent('请发送一个请求到服务器').kind).toBe('unknown');});
 it('rejects malformed network messages',()=>{expect(ClientMessageSchema.safeParse({id,type:'audio',payload:{pcm:'x',sampleRate:44100}}).success).toBe(false);});
 it('preserves Chinese numerals in reminder content',()=>{const r=parseReminder('明天下午三点提醒我买三本书',now,id);expect(r.ok&&r.reminder.title).toBe('买三本书');});
+it('keeps edits made while a terminal submission is pending',async()=>{
+ const d=new DraftController();d.select('a');d.append('first');let done:()=>void=()=>{};
+ const sending=d.submit('one','a',d.state.revision,()=>new Promise<void>(resolve=>{done=resolve;}));
+ await expect(d.submit('two','a',d.state.revision,async()=>{})).rejects.toThrow('正在提交');
+ d.update('next draft');done();await sending;expect(d.state.text).toBe('next draft');
+});

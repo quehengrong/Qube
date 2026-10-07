@@ -76,7 +76,7 @@ async function start(){dir=app.getPath('userData');config=loadConfig(dir);try{co
   'speech-health':()=>speech.health(),'speech-unload':()=>speech.unload()
  };
  for(const [name,fn] of Object.entries(handlers))ipcMain.handle(name,async(event,arg)=>{if(event.sender!==win.webContents||event.senderFrame!==win.webContents.mainFrame)throw Error('Invalid caller');try{return await fn(arg);}catch(e){feedback(e instanceof Error?e.message:'操作失败',true);throw e;}});
- const icon=nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAFUlEQVR42mNk+P+/HgMZgIHFQAwAAErfAh/NTlvjAAAAAElFTkSuQmCC');
+ const icon=nativeImage.createFromPath(join(base,'renderer','icon.png')).resize({width:18,height:18});
  tray=new Tray(icon);tray.setToolTip('Qube');tray.setContextMenu(Menu.buildFromTemplate([{label:'打开 Qube',click:()=>win.show()},{label:'退出',click:()=>app.quit()}]));tray.on('double-click',()=>win.show());
  await win.loadFile(join(base,'renderer','index.html'));
  try{await bridge.start();}catch(e){feedback(`连接服务启动失败：${String(e)}`,true);}

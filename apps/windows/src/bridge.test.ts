@@ -9,3 +9,12 @@ it('authenticates TLS clients, deduplicates requests and revokes credentials',as
  const closed=new Promise(resolve=>ws!.once('close',resolve));bridge.rotate();await closed;expect(bridge.pairing()[0].token).not.toBe(p.token);
  }finally{ws?.terminate();bridge.stop();rmSync(dir,{recursive:true,force:true});}
 },15000);
+it('rejects a wrong pairing token before delivering any command',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'qube-denied-'));const bridge=new Bridge(dir,29432);let ws:WebSocket|undefined;
+ try{await bridge.start();let delivered=false;bridge.handler=async()=>{delivered=true;};
+ ws=new WebSocket('wss://127.0.0.1:29432/bridge',{rejectUnauthorized:false});await new Promise<void>((resolve,reject)=>{ws!.once('open',resolve);ws!.once('error',reject);});
+ const closed=new Promise<number>(resolve=>ws!.once('close',resolve));
+ ws.send(JSON.stringify({id:randomUUID(),type:'hello',payload:{token:'invalid'.repeat(8),version:1}}));
+ expect(await closed).toBe(1008);expect(delivered).toBe(false);expect(bridge.connected).toBe(false);
+ }finally{ws?.terminate();bridge.stop();rmSync(dir,{recursive:true,force:true});}
+},15000);
