@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.room.*
+import androidx.room.Entity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch

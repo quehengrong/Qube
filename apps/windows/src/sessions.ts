@@ -1,6 +1,6 @@
 import type * as pty from 'node-pty';
 import {createRequire} from 'node:module';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {EventEmitter} from 'node:events';
 import {mkdirSync,writeFileSync,readFileSync,existsSync,statSync} from 'node:fs';
 import {join} from 'node:path';
@@ -30,7 +30,7 @@ export class Sessions extends EventEmitter {
     const args:string[]=[];
     if(c.agent==='claude'&&c.enhanced){
      const folder=join(this.dir,'hooks',id);mkdirSync(folder,{recursive:true});const events=join(folder,'events.jsonl'),script=join(folder,'relay.py'),settings=join(folder,'settings.json');writeFileSync(events,'');
-     writeFileSync(script,"import sys,json,os\np=json.load(sys.stdin)\nf=sys.argv[1]\nwith open(f,'a',encoding='utf-8') as out: out.write(json.dumps(p,ensure_ascii=False)+'\\n')\n");
+     writeFileSync(script,"import sys,json,os\np=json.load(sys.stdin)\np={k:p.get(k) for k in ['hook_event_name','tool_name','notification_type']}\nf=sys.argv[1]\nwith open(f,'a',encoding='utf-8') as out: out.write(json.dumps(p,ensure_ascii=False)+'\\n')\n");
      const scriptPath=await this.path(entry.info,script),eventPath=await this.path(entry.info,events);const hookCommand=c.environment==='wsl'?['python3',scriptPath,eventPath].map(quote).join(' '):[this.python,scriptPath,eventPath].map(x=>'"'+x.replaceAll('"','')+'"').join(' ');
      const hooks=Object.fromEntries(['UserPromptSubmit','PreToolUse','PostToolUse','PermissionRequest','Notification','Stop','StopFailure','SessionEnd'].map(event=>[event,[{hooks:[{type:'command',command:hookCommand,timeout:5}]}]]));writeFileSync(settings,JSON.stringify({hooks}));args.push('--settings',await this.path(entry.info,settings));entry.events=events;entry.timer=setInterval(()=>this.pollHooks(id),250);
     }
@@ -46,7 +46,7 @@ export class Sessions extends EventEmitter {
  respond(id:string,key:string,answer:any){this.get(id).agent?.respond(key,answer);}
  async submit(id:string,text:string,attachments:Attachment[]=[]){
   const s=this.get(id);if(['running','waiting_input','waiting_approval','starting'].includes(s.info.status??''))throw Error('会话正在工作或等待处理，请先查看电脑');
-  const images:Attachment[]=[];for(const a of attachments){if(!existsSync(a.path)||statSync(a.path).size!==a.bytes)throw Error('附件缺失或已变化，请重新截图');images.push({...a,path:await this.path(s.info,a.path)});}
+  const images:Attachment[]=[];for(const a of attachments){if(!existsSync(a.path)||statSync(a.path).size!==a.bytes||createHash('sha256').update(readFileSync(a.path)).digest('hex')!==a.sha256)throw Error('附件缺失或已变化，请重新截图');images.push({...a,path:await this.path(s.info,a.path)});}
   if(s.agent){await s.agent.submit(text,images);return;}
   if(images.length&&s.info.agent==='codex')throw Error('Codex 图片任务需要增强会话');
   const input=text+(images.length?'\n请查看这些本地图片：\n'+images.map(a=>a.path).join('\n'):'');
