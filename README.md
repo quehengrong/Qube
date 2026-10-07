@@ -10,8 +10,8 @@
 
 从 [GitHub Actions 构建记录](https://github.com/quehengrong/Qube/actions/workflows/build.yml) 的成功运行中下载：
 
-- [**Qube-Windows-x64-preview**](https://github.com/quehengrong/Qube/actions/workflows/build.yml)：Windows 11 安装程序。
-- [**Qube-Android-arm64-preview**](https://github.com/quehengrong/Qube/actions/workflows/build.yml)：Redmi 可安装的固定发布签名 APK。旧 debug 版先按 [迁移说明](docs/setup.md#从-01-debug-apk-升级) 导出数据。
+- [**Qube-Windows-x64-preview**](https://github.com/quehengrong/Qube/actions/runs/37591611167/artifacts/11469480665)：Windows 11 安装程序。
+- [**Qube-Android-arm64-preview**](https://github.com/quehengrong/Qube/actions/runs/37591611167/artifacts/11469002095)：Redmi 可安装的固定发布签名 APK。旧 debug 版先按 [迁移说明](docs/setup.md#从-01-debug-apk-升级) 导出数据。
 
 按 [安装与使用说明](docs/setup.md) 配置本地语音环境、手机权限和扫码配对。模型下载需要联网；正常语音处理在本地完成。实际 Redmi / Windows 软件版本仍需完成 [设备验收](docs/validation.md)。
 
