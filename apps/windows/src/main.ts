@@ -14,6 +14,7 @@ import { Sessions } from './sessions.js';
 import { ConfigSchema, loadConfig, saveJson } from './config.js';
 import { Speech } from './speech.js';
 import { control } from './control.js';
+if(process.env.QUBE_USER_DATA)app.setPath('userData',process.env.QUBE_USER_DATA);
 const base=dirname(fileURLToPath(import.meta.url));let win:BrowserWindow;let tray:Tray;let bridge:Bridge;let quitting=false;
 const sessions=new Sessions(),draft=new DraftController(),speech=new Speech();let face:FaceState='idle';let lastMessage='欢迎来到 Qube';
 const pendingReminders=new Set<string>();let dir:string;let config:ReturnType<typeof loadConfig>;

@@ -5,6 +5,7 @@ import android.content.*
 import android.net.Uri
 import android.os.Build
 import androidx.room.*
+import androidx.room.Entity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -32,7 +33,7 @@ class ReminderScheduler(private val c:Context,private val db:ReminderDb){
  fun allowed()=Build.VERSION.SDK_INT<31||manager.canScheduleExactAlarms()
  private fun pending(r:Reminder)=PendingIntent.getBroadcast(c,0,Intent(c,AlarmReceiver::class.java).setAction("fire").setData(Uri.parse("qube://reminder/${r.id}")).putExtra("id",r.id).putExtra("revision",r.revision).putExtra("dueAt",r.dueAt),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
  fun schedule(r:Reminder){manager.cancel(pending(r));if(r.status=="active"){check(allowed()){"请先授予“闹钟和提醒”权限"};manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,ReminderTime.trigger(r,System.currentTimeMillis()),pending(r))}}
- suspend fun save(r:Reminder){require(r.title.isNotBlank()&&r.title.length<=500){"请填写提醒内容"};require(r.advanceMinutes in 0..10080&&r.repeat in listOf("none","daily","weekly")&&r.zone=="Asia/Shanghai"){"提醒参数无效"};check(r.status!="active"||allowed()){ "请先授予“闹钟和提醒”权限" };require(r.dueAt>System.currentTimeMillis()||r.status!="active"){"请选择未来时间"}
+ suspend fun save(r:Reminder){check(r.status!="active"||c.getSystemService(NotificationManager::class.java).areNotificationsEnabled()){"请先允许 Qube 通知，以免漏掉提醒"};require(r.title.isNotBlank()&&r.title.length<=500){"请填写提醒内容"};require(r.advanceMinutes in 0..10080&&r.repeat in listOf("none","daily","weekly")&&r.zone=="Asia/Shanghai"){"提醒参数无效"};check(r.status!="active"||allowed()){ "请先授予“闹钟和提醒”权限" };require(r.dueAt>System.currentTimeMillis()||r.status!="active"){"请选择未来时间"}
   val old=db.reminders().get(r.id);require(old==null||r.revision>old.revision){"提醒已变化，请重新编辑"};db.reminders().put(r);try{schedule(r)}catch(e:Exception){if(old!=null)db.reminders().put(old)else db.reminders().put(r.copy(status="unscheduled"));throw e}
  }
  suspend fun restore(){for(r in db.reminders().active()){var next=r;if(r.dueAt<System.currentTimeMillis()-60000){if(r.repeat=="none"){db.reminders().put(r.copy(status="overdue"));continue};next=r.copy(dueAt=ReminderTime.next(r.dueAt,r.repeat,System.currentTimeMillis()),revision=r.revision+1);db.reminders().put(next)};if(allowed())schedule(next)}}

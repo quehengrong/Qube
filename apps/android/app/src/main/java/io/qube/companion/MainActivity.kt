@@ -72,13 +72,13 @@ class MainActivity:ComponentActivity(){
  private fun rejectProposal(state:UiState){app.bridge.send("reminder-result",JSONObject().put("ok",false).put("message","已取消提醒"),state.proposalId);app.ui.update{it.copy(proposal=null)}}
  private fun action(r:Reminder,action:String){app.scope.launch{try{app.alarms.action(r.id,action)}catch(e:Exception){app.error(e.message?:"操作失败")}}}
  @Composable private fun Coding(state:UiState){
-  var text by remember{mutableStateOf(state.draft)};var dirty by remember{mutableStateOf(false)};var revision by remember{mutableIntStateOf(state.revision)}
-  LaunchedEffect(state.draft,state.revision){if(!dirty){text=state.draft;revision=state.revision}}
+  var text by remember{mutableStateOf(state.draft)};var dirty by remember{mutableStateOf(false)};var revision by remember{mutableIntStateOf(state.revision)};var awaitingText by remember{mutableStateOf<String?>(null)}
+  LaunchedEffect(state.draft,state.revision){if(awaitingText!=null&&state.revision>revision&&state.draft==awaitingText){dirty=false;awaitingText=null};if(!dirty){text=state.draft;revision=state.revision}}
   Column(Modifier.fillMaxSize().padding(18.dp).verticalScroll(rememberScrollState())){
    Text("目标会话",fontSize=20.sp);Row{for(s in state.sessions.filter{it.alive}){TextButton(onClick={app.bridge.send("select-session",JSONObject().put("sessionId",s.id))}){Text((if(s.id==state.sessionId)"✓ " else "")+s.name)}}}
    if(state.sessions.none{it.alive})Text("先在电脑 Qube 中启动一个 Codex 或 Claude 会话。")
    OutlinedTextField(value=text,onValueChange={text=it;dirty=true},label={Text("语音草稿 · 确认后发送")},modifier=Modifier.fillMaxWidth(),minLines=3,maxLines=6)
-   Row{TextButton(onClick={app.bridge.send("text",JSONObject().put("text",if(state.mode=="dictation")"退出编程听写" else "进入编程听写"))}){Text(if(state.mode=="dictation")"退出听写" else "进入听写")};TextButton(onClick={if(app.bridge.send("draft-update",JSONObject().put("text",text).put("revision",revision)))dirty=false}){Text("保存修改")};TextButton(onClick={app.bridge.send("draft-update",JSONObject().put("text","").put("revision",state.revision));dirty=false}){Text("清空")};Button(enabled=state.canSend&&state.draft.isNotBlank()&&!dirty&&state.connected,onClick={app.bridge.send("draft-submit",JSONObject().put("sessionId",state.sessionId).put("revision",state.revision))}){Text("确认发送")}}
+   Row{TextButton(onClick={app.bridge.send("text",JSONObject().put("text",if(state.mode=="dictation")"退出编程听写" else "进入编程听写"))}){Text(if(state.mode=="dictation")"退出听写" else "进入听写")};TextButton(onClick={if(app.bridge.send("draft-update",JSONObject().put("text",text).put("revision",revision)))awaitingText=text}){Text("保存修改")};TextButton(onClick={if(app.bridge.send("draft-update",JSONObject().put("text","").put("revision",state.revision))){awaitingText="";dirty=true;revision=state.revision}}){Text("清空")};Button(enabled=state.canSend&&state.draft.isNotBlank()&&!dirty&&state.connected,onClick={app.bridge.send("draft-submit",JSONObject().put("sessionId",state.sessionId).put("revision",state.revision))}){Text("确认发送")}}
    Text(state.message,color=MaterialTheme.colorScheme.primary);if(state.transcript.isNotBlank())Text("听到：${state.transcript}",fontSize=12.sp)
   }
  }
@@ -101,7 +101,36 @@ class MainActivity:ComponentActivity(){
  }
  @Composable private fun ReminderEditor(old:Reminder?,onDismiss:()->Unit,onSave:(Reminder)->Unit){
   var title by remember{mutableStateOf(old?.title?:"")};var time by remember{mutableStateOf(formatTime(old?.dueAt?:System.currentTimeMillis()+3600000))};var advance by remember{mutableStateOf((old?.advanceMinutes?:10).toString())};var repeat by remember{mutableStateOf(old?.repeat?:"none")};var error by remember{mutableStateOf("")}
-  AlertDialog(onDismissRequest=onDismiss,title={Text(if(old==null)"新增提醒" else "编辑提醒")},text={Column(Modifier.verticalScroll(rememberScrollState())){OutlinedTextField(title,{title=it},label={Text("事项")});OutlinedTextField(time,{time=it},label={Text("上海时间 yyyy-MM-dd HH:mm")});OutlinedTextField(advance,{advance=it},label={Text("提前分钟")});Row{for(v in listOf("none","daily","weekly")){TextButton(onClick={repeat=v}){Text((if(repeat==v)"✓" else "")+repeatLabel(v))}};Text(error,color=MaterialTheme.colorScheme.error)}},confirmButton={TextButton(onClick={try{val date=LocalDateTime.parse(time,DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(java.time.format.ResolverStyle.STRICT)).atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli();onSave(Reminder(id=old?.id?:UUID.randomUUID().toString(),title=title,dueAt=date,advanceMinutes=advance.toInt(),repeat=repeat,revision=(old?.revision?:-1)+1))}catch(e:Exception){error="请检查日期、时间和提前分钟"}}){Text("保存")}},dismissButton={TextButton(onClick=onDismiss){Text("取消")}})
+  AlertDialog(
+   onDismissRequest = onDismiss,
+   title = { Text(if (old == null) "新增提醒" else "编辑提醒") },
+   text = {
+    Column(Modifier.verticalScroll(rememberScrollState())) {
+     OutlinedTextField(title, { title = it }, label = { Text("事项") })
+     OutlinedTextField(time, { time = it }, label = { Text("上海时间 yyyy-MM-dd HH:mm") })
+     OutlinedTextField(advance, { advance = it }, label = { Text("提前分钟") })
+     Row {
+      for (v in listOf("none", "daily", "weekly")) {
+       TextButton(onClick = { repeat = v }) { Text((if (repeat == v) "✓" else "") + repeatLabel(v)) }
+      }
+     }
+     Text(error, color = MaterialTheme.colorScheme.error)
+    }
+   },
+   confirmButton = {
+    TextButton(onClick = {
+     try {
+      val date = LocalDateTime.parse(time, DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+       .withResolverStyle(java.time.format.ResolverStyle.STRICT))
+       .atZone(ZoneId.of("Asia/Shanghai")).toInstant().toEpochMilli()
+      onSave(Reminder(id = old?.id ?: UUID.randomUUID().toString(), title = title,
+       dueAt = date, advanceMinutes = advance.toInt(), repeat = repeat,
+       revision = (old?.revision ?: -1) + 1))
+     } catch (e: Exception) { error = "请检查日期、时间和提前分钟" }
+    }) { Text("保存") }
+   },
+   dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+  )
  }
 }
 fun formatTime(millis:Long):String=Instant.ofEpochMilli(millis).atZone(ZoneId.of("Asia/Shanghai")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))

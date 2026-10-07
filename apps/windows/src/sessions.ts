@@ -1,4 +1,6 @@
-import * as pty from 'node-pty';
+import type * as pty from 'node-pty';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import type { SessionInfo } from '@qube/protocol';
@@ -12,7 +14,8 @@ export class Sessions extends EventEmitter {
   const c=LaunchSchema.parse(input);let executable:string,args:string[],cwd:string|undefined;
   if(c.environment==='wsl'){executable='wsl.exe';args=[...(c.distribution?['--distribution',c.distribution]:[]),'--cd',c.cwd,'--exec',c.agent];}
   else{executable='powershell.exe';args=['-NoLogo','-NoProfile','-Command',`& ${c.agent}; exit $LASTEXITCODE`];cwd=c.cwd;}
-  const id=randomUUID();const child=pty.spawn(executable,args,{name:'xterm-256color',cols:100,rows:28,cwd,env:process.env as Record<string,string>});
+  const native=require('node-pty') as typeof pty;
+  const id=randomUUID();const child=native.spawn(executable,args,{name:'xterm-256color',cols:100,rows:28,cwd,env:process.env as Record<string,string>});
   const entry={info:{id,name:c.name,environment:c.environment,agent:c.agent,cwd:c.cwd,alive:true},pty:child,output:''};this.all.set(id,entry);
   child.onData(data=>{entry.output=(entry.output+data).slice(-200000);this.emit('output',{sessionId:id,data});});
   child.onExit(()=>{entry.info.alive=false;this.emit('changed');});this.emit('changed');return entry.info;

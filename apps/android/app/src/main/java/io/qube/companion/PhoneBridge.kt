@@ -42,7 +42,8 @@ class PhoneBridge(private val app:QubeApp){
    override fun onOpen(ws:WebSocket,response:Response){if(current!=generation)return;ws.send(envelope("hello",JSONObject().put("token",p.getString("token")).put("version",1)))}
    override fun onMessage(ws:WebSocket,text:String){if(current!=generation)return;try{receive(JSONObject(text))}catch(e:Exception){app.error("消息处理失败：${e.message}")}}
    override fun onFailure(ws:WebSocket,t:Throwable,response:Response?){if(current==generation)lost()}
-   override fun onClosed(ws:WebSocket,code:Int,reason:String){if(current==generation){if(code==1008){app.prefs().edit().remove("pairing").apply();app.error("配对已失效，请重新扫描")}lost()}}
+   override fun onClosing(ws:WebSocket,code:Int,reason:String){ws.close(code,reason)}
+   override fun onClosed(ws:WebSocket,code:Int,reason:String){if(current==generation){if(code==1008){app.prefs().edit().remove("pairing").apply();app.error("配对已失效，请重新扫描")};lost()}}
   })
  }
  private fun lost(){app.ui.update{it.copy(connected=false,canSend=false,face="offline",message="电脑离线，已有提醒仍会准时提醒")};reconnect?.cancel();reconnect=app.scope.launch{delay(5000);connect()}}

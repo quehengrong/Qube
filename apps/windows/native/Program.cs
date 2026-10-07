@@ -26,7 +26,7 @@ internal static class Program {
  }
  static AutomationElement? Find(AutomationElement root,string name) {
   var list=root.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.NameProperty,name));
-  var visible=new List<AutomationElement>();foreach(AutomationElement e in list)if(!e.Current.IsOffscreen&&e.Current.IsEnabled)visible.Add(e);
+  var visible=new List<AutomationElement>();foreach(AutomationElement e in list)if(!e.Current.IsOffscreen&&e.Current.IsEnabled && (e.TryGetCurrentPattern(InvokePattern.Pattern,out _)||e.TryGetCurrentPattern(TogglePattern.Pattern,out _)||e.TryGetCurrentPattern(SelectionItemPattern.Pattern,out _)))visible.Add(e);
   if(visible.Count>1)throw new Exception($"控件名称重复：{name}，请在设置中绑定唯一名称");return visible.SingleOrDefault();
  }
  static void Click(AutomationElement e) {
@@ -35,7 +35,7 @@ internal static class Program {
   else throw new Exception("控件不支持自动操作，请运行 inspect 检查客户端兼容性");
  }
  static string Night(JsonElement r) {
-  Process.Start(new ProcessStartInfo("ms-settings:nightlight"){UseShellExecute=true});
+  Process.Start(new ProcessStartInfo("ms-settings:display"){UseShellExecute=true});
   var window=Wait(()=>Window("SystemSettings"),"未找到 Windows 设置窗口，请解锁电脑");
   var name=r.GetProperty("name").GetString()!;
   var toggle=Wait(()=>Find(window,name),$"未找到暖色开关：{name}。请检查设置中的控件名称");
