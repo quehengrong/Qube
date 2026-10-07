@@ -25,17 +25,17 @@ Windows 防火墙只需在专用网络允许 TCP 19431。企业 Wi-Fi 的客户�
 
 点击“开启唤醒词监听”，说“小机小机”，眼睛进入聆听状态后再说指令。监听包含常驻通知，可在应用内停止。重启手机后重新打开应用并启动麦克风监听；提醒由开机接收器恢复，不依赖麦克风。
 
-更换唤醒词目前为高级音素配置：采用 sherpa 中文声母/带声调韵母，以空格分隔，`@` 后为显示名称，例如默认 `x iǎo j ī x iǎo j ī @小机小机`。保存后停止再启动监听，在真机测试命中率。
+设置中输入 2～6 个汉字，点击“生成并试唤醒”。新词识别成功后才能确认保存；取消则继续使用旧词。转换需要电脑语音服务安装新增依赖 `pypinyin`，语音服务升级时重新运行 `setup.ps1`。仍保留高级音素设置供诊断。
 
 ## 3. CLI 听写
 
 先在 WSL 或 PowerShell 安装并登录 Codex / Claude。Qube 不管理 agent 的账号和授权。
 
-在电脑 Qube 的“编程听写”中选择环境、agent 和实际项目目录，启动会话；WSL 目录填写 Linux 路径，可填写发行版名称。程序通过 WSL 的交互登录 Bash 启动固定的 `exec codex` 或 `exec claude`，以加载常见 nvm/PATH 配置；请确保在该 Bash 环境中能运行对应命令。工作目录作为独立参数传入，不拼接到 Shell 命令中。
+在电脑 Qube 的“编程听写”中选择环境、agent 和实际项目目录，启动会话；WSL 目录填写 Linux 路径，可填写发行版名称。程序通过 WSL 的交互登录 Bash 启动对应 CLI，以加载常见 nvm/PATH 配置；请确保在该 Bash 环境中能运行对应命令。工作目录作为独立参数传入，不拼接到 Shell 命令中。
 
 选中目标会话，说“进入编程听写”。说完需求后，检查手机或电脑草稿；编辑后点“保存修改”。确认 agent 正在输入提示符，再点“确认发送”，或唤醒后单独说“确认发送”。听写正文不会作为电脑操作执行。
 
-Qube 采用终端括号粘贴和回车提交，须在实际 CLI 版本中验证多行行为。agent 权限提示仍需在终端由用户操作。会话退出或手机断线后需重新选择会话。
+默认增强会话中，Codex 使用 App Server 结构化输入，授权及提问在电脑卡片处理；Claude 使用终端括号粘贴及独立 hooks，授权仍在终端处理。Claude hooks 需要 Windows 已配置的语音 Python，或 WSL 的 python3。兼容模式保留终端输入但不推测工作状态。会话退出或手机断线后需重新选择会话。更多流程见 [增强功能说明](enhancements.md)。
 
 ## 4. 电脑控制
 
@@ -88,4 +88,16 @@ python3 scripts/fetch-android-assets.py
 gradle -p apps/android testDebugUnitTest assembleDebug lintDebug
 ```
 
-构建下载 sherpa AAR 与唤醒模型并核对 SHA-256；不将模型加入 Git。Android 产物是 debug 签名，正式分发前需配置私人签名密钥。桌面包未配置代码签名。
+构建下载 sherpa AAR 与唤醒模型并核对 SHA-256；不将模型加入 Git。本地 `assembleDebug` 仍使用开发签名。CI 使用 GitHub Secrets 中的固定私人密钥生成 release APK；密钥不在仓库中。桌面包未配置代码签名。
+
+## 从 0.1 debug APK 升级
+
+0.2 CI APK 改用固定发布签名，不能直接覆盖旧 debug 签名。已经有提醒的设备，先导出再迁移，不要直接卸载。旧版缺少应用内导出入口，可以在已授权 USB 调试的电脑上运行：
+
+```sh
+python3 scripts/backup-preview-phone.py /path/outside/repo/Qube-backup.json
+```
+
+脚本临时停止应用以取得一致的数据库副本，完成后重新打开；不会卸载应用或导出配对凭据。确认输出的提醒数量和 JSON 内容后，才卸载旧 debug APK，安装新的 release APK，在手机设置中“导入备份”，重新授予通知和精确提醒权限并扫码配对。导入合并缺失记录，保留已有记录。未来相同固定签名的版本可覆盖升级。
+
+0.2 手机设置也提供应用内导出/导入；备份含个人提醒和灵感，请保存在自己的位置。桌面数据库位于 Electron 用户数据目录 `qube.db`，原 `draft.json` 保留。固定 Android 私钥由仓库所有者在本机 `~/.config/qube/signing/` 备份，CI 仅读取加密 Secrets。

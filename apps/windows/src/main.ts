@@ -27,7 +27,7 @@ const single=app.requestSingleInstanceLock();if(!single)app.quit();
 app.on('second-instance',()=>{win?.show();win?.focus();});
 function state(){return {face,message:lastMessage,connected:bridge?.connected??false,sessions:sessions.list(),draft:draft.state,speech:speech.status,protocol:2,savedDrafts:draft.saved(),capabilities:['agents','draft-history','attachments','scenes','phone-local','metrics','history'],approvals:sessions.approvals(),scene:scenes.current,metrics,history:store?.history()??[],helper:{running:helperAgent.running,result:helperAgent.result},rewrite};}
 function publish(){const s=state();win?.webContents.send('state',s);bridge?.broadcast({id:randomUUID(),type:'state',payload:s});store?.put('drafts',draft.export());}
-function feedback(message:string,error=false,id:string=randomUUID()){lastMessage=message;face=error?'error':'success';store?.event('操作反馈',error?'failed':'success',message,draft.state.sessionId??'',id);bridge?.broadcast({id,type:error?'error':'result',payload:{message}});publish();}
+function feedback(message:string,error=false,id:string=randomUUID(),record=true){lastMessage=message;face=error?'error':'success';if(record)store?.event('操作反馈',error?'failed':'success',message,draft.state.sessionId??'',id);bridge?.broadcast({id,type:error?'error':'result',payload:{message}});publish();}
 async function textCommand(text:string,id:string){
  const assistant=text.startsWith('助手，')||text.startsWith('助手,');if(assistant)text=text.slice(3);
  if(text==='确认修改'){await feature({action:'apply-rewrite'},id);return;}if(text==='取消修改'){rewrite=null;publish();return;}
@@ -50,7 +50,7 @@ async function textCommand(text:string,id:string){
  face='executing';publish();const helper=app.isPackaged?join(process.resourcesPath,'native','Qube.Native.exe'):join(base,'..','native','publish','Qube.Native.exe');
  feedback(await control(parsed,config,helper),false,id);
 }
-async function submit(id:string,sessionId:string,revision:number){const sent=await draft.submit(id,sessionId,revision,(sid,text,images)=>sessions.submit(sid,text,images),()=>store.put('drafts',draft.export()));if(sent)feedback('已发送到选定会话',false,id);else publish();}
+async function submit(id:string,sessionId:string,revision:number){const sent=await draft.submit(id,sessionId,revision,(sid,text,images)=>sessions.submit(sid,text,images),()=>store.put('drafts',draft.export()));if(sent){const info=sessions.list().find(s=>s.id===sessionId);const label=info?`${info.name} · ${info.agent} · ${info.environment} · ${info.cwd}`:sessionId;store.event('发送任务','success',`已发送到 ${label}`,sessionId,id);feedback(`已发送到 ${info?.name??'选定会话'}`,false,id,false);}else publish();}
 async function message(m:ClientMessage){
  try{switch(m.type){
   case 'phone-events':store.merge(m.payload.events);publish();break;

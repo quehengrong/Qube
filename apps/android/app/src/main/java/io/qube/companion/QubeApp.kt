@@ -30,14 +30,14 @@ class QubeApp:Application(){
  @Volatile var speaking=false
  @Volatile var ttsReady=false
  private var ttsInitialized=false
- override fun onCreate(){super.onCreate();instance=this
+ override fun onCreate(){super.onCreate();instance=this;prefs().edit().remove("candidateTokens").apply()
   val nm=getSystemService(NotificationManager::class.java)
   nm.createNotificationChannel(NotificationChannel("voice","Qube 语音伙伴",NotificationManager.IMPORTANCE_LOW))
   nm.createNotificationChannel(NotificationChannel("reminders-v2","Qube 提醒",NotificationManager.IMPORTANCE_HIGH).apply{setSound(null,null)})
   nm.createNotificationChannel(NotificationChannel("silent","Qube 无声通知",NotificationManager.IMPORTANCE_LOW).apply{setSound(null,null)})
   db=ReminderDb.open(this);alarms=ReminderScheduler(this,db);bridge=PhoneBridge(this);companion=CompanionManager(this);ui.update{it.copy(quiet=prefs().getBoolean("quiet",false))};scope.launch{companion.restore()}
   handler.postDelayed({ttsInitialized=true;nextSpeech()},8000)
-  tts=TextToSpeech(this){status->ttsInitialized=true;if(status==TextToSpeech.SUCCESS){val engine=tts;val voice=engine?.voices?.firstOrNull{it.locale.language=="zh"&&!it.isNetworkConnectionRequired};if(voice!=null){engine.voice=voice;ttsReady=true;handler.post{nextSpeech()}}else{ui.update{it.copy(message="请在系统文字转语音设置中下载中文离线语音")}}};handler.post{nextSpeech()}}
+  tts=TextToSpeech(this){status->ttsInitialized=true;if(status==TextToSpeech.SUCCESS){val engine=tts;val voice=engine?.voices?.firstOrNull{it.locale.language=="zh"&&!it.isNetworkConnectionRequired};if(voice!=null){engine.voice=voice;ttsReady=true;ui.update{it.copy(profileRevision=it.profileRevision+1)};handler.post{nextSpeech()}}else{ui.update{it.copy(message="请在系统文字转语音设置中下载中文离线语音")}}};handler.post{nextSpeech()}}
   tts?.setOnUtteranceProgressListener(object:UtteranceProgressListener(){override fun onStart(id:String?){speaking=true};override fun onDone(id:String?){handler.post{finishSpeech(id)}};@Deprecated("Legacy TTS") override fun onError(id:String?){handler.post{finishSpeech(id)}}})
  }
  fun quietNow():Boolean {val f=runCatching{JSONObject(ui.value.focus)}.getOrNull();return prefs().getBoolean("quiet",false)||(f?.optString("status")=="running"&&f.optString("kind")=="focus")}

@@ -27,7 +27,7 @@ data class CompanionRecord(@PrimaryKey val id:String,val kind:String,val json:St
  @Query("DELETE FROM companion WHERE kind IN ('history','receipt') AND (updatedAt<:cutoff OR id IN (SELECT id FROM companion WHERE kind='history' ORDER BY updatedAt DESC LIMIT -1 OFFSET 10000))") suspend fun prune(cutoff:Long)
 }
 class CompanionManager(private val app:QubeApp){
- private val lock=Mutex();private val dao get()=app.db.companion()
+ private val lock=Mutex();private val imported=java.util.Collections.synchronizedSet(LinkedHashSet<String>());private val dao get()=app.db.companion()
  private val alarms get()=app.getSystemService(AlarmManager::class.java)
  private fun boot()=Settings.Global.getInt(app.contentResolver,Settings.Global.BOOT_COUNT,0)
  private fun pending(id:String)=PendingIntent.getBroadcast(app,0,Intent(app,FocusReceiver::class.java).setData(Uri.parse("qube://focus/$id")).putExtra("id",id),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -36,7 +36,7 @@ class CompanionManager(private val app:QubeApp){
   dao.put(CompanionRecord(id,"history",j.toString()));if(app.ui.value.connected)app.bridge.send("phone-events",JSONObject().put("events",org.json.JSONArray().put(j)));dao.prune(System.currentTimeMillis()-30L*86400000)
  }
  suspend fun syncHistory(){if(app.ui.value.connected){val events=org.json.JSONArray();dao.list("history").filter{JSONObject(it.json).optString("source")=="phone"}.take(100).forEach{events.put(JSONObject(it.json))};app.bridge.send("phone-events",JSONObject().put("events",events))}}
- suspend fun importHistory(events:org.json.JSONArray){for(i in 0 until events.length()){val e=events.getJSONObject(i);dao.put(CompanionRecord(e.getString("id"),"history",e.toString(),e.getLong("at")))};dao.prune(System.currentTimeMillis()-30L*86400000)}
+ suspend fun importHistory(events:org.json.JSONArray){for(i in 0 until events.length()){val e=events.getJSONObject(i);val id=e.getString("id");if(imported.add(id)&&dao.get(id)==null)dao.put(CompanionRecord(id,"history",e.toString(),e.getLong("at")));if(imported.size>10000)imported.clear()};dao.prune(System.currentTimeMillis()-30L*86400000)}
  suspend fun note(text:String,project:String="",id:String=UUID.randomUUID().toString()){
   require(text.isNotBlank()&&text.length<=16000){"请填写 1～16000 字的灵感"};val old=dao.get(id)?.let{JSONObject(it.json)};val j=(old?:JSONObject().put("id",id).put("createdAt",System.currentTimeMillis())).put("text",text).put("project",project).put("archived",false);dao.put(CompanionRecord(id,"note",j.toString()));log("灵感","灵感已保存到手机")
  }
@@ -52,9 +52,9 @@ class CompanionManager(private val app:QubeApp){
   "focus-resume"->{check(f.getString("status")=="paused"){"计时正在运行"};val left=f.getLong("remaining");f.put("status","running").put("end",System.currentTimeMillis()+left).put("elapsedEnd",SystemClock.elapsedRealtime()+left).put("boot",boot());schedule(f)}
   else->{alarms.cancel(pending(f.getString("id")));f.put("status","cancelled")}
  };saveFocus(f);log("计时",when(action){"focus-pause"->"已暂停";"focus-resume"->"已继续";else->"已结束"})}
- suspend fun restore(){lock.withLock{val f=focus()?:return@withLock;app.ui.update{it.copy(focus=f.toString())};if(f.optString("status")=="running"){if(remaining(f)<=0)finish(f.getString("id"))else if(app.alarms.allowed())schedule(f)}}}
+ suspend fun restore(){lock.withLock{val f=focus()?:return@withLock;app.ui.update{it.copy(focus=f.toString())};if(f.optString("status")=="running"){val left=remaining(f);if(left<=0)finish(f.getString("id"))else {f.put("end",System.currentTimeMillis()+left).put("elapsedEnd",SystemClock.elapsedRealtime()+left).put("boot",boot());saveFocus(f);if(app.alarms.allowed())schedule(f)}}}}
  suspend fun fire(id:String){lock.withLock{val f=focus()?:return@withLock;if(f.optString("id")==id&&f.optString("status")=="running"){if(remaining(f)>1000)schedule(f)else finish(id)}}}
- private suspend fun finish(id:String){val f=focus()?:return;f.put("status","completed");saveFocus(f);val title=if(f.optString("kind")=="focus")"专注结束，休息一下吧" else "休息结束，准备好再开始";log("计时结束",title);app.startForegroundService(Intent(app,ReminderSpeaker::class.java).putExtra("id",id).putExtra("title",title).putExtra("category","timer"))}
+ private suspend fun finish(id:String){val f=focus()?:return;f.put("status","completed");saveFocus(f);val title=if(f.optString("kind")=="focus")"专注结束，休息一下吧" else "休息结束，准备好再开始";log("计时结束",title);try{app.startForegroundService(Intent(app,ReminderSpeaker::class.java).putExtra("id",id).putExtra("title",title).putExtra("category","timer"))}catch(_:IllegalStateException){app.notice(id,title,"timer")}}
  suspend fun execute(id:String,p:JSONObject):String=lock.withLock{
   dao.get("receipt:$id")?.let{return@withLock JSONObject(it.json).getString("message")}
   val message=when(p.getString("action")){

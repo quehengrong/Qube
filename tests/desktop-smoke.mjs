@@ -29,5 +29,5 @@ try {
  await page.screenshot({path:'docs/screenshots/desktop.png',fullPage:true});
  await page.locator('#command').fill('明天下午三点提醒我开会');await page.locator('#command-form button').click();
  await expect(page.locator('#toast')).toContainText('连接手机');
- expect(errors).toEqual([]);console.log('Desktop smoke passed: navigation, pairing QR, disabled submission, offline reminder failure, no renderer errors');
+ expect(errors).toEqual([]);console.log('Desktop smoke passed: navigation, project configuration, enhanced session checkbox, draft undo/redo, pairing QR, disabled submission, offline reminder failure, no renderer errors');
 } finally {if(app)await app.close();rmSync(profile,{recursive:true,force:true});}

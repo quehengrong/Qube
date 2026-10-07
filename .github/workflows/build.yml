@@ -77,6 +77,10 @@ jobs:
       - run: gradle -p apps/android testReleaseUnitTest assembleRelease lintRelease --no-daemon
         env:
           QUBE_ANDROID_STORE_PASSWORD: ${{ secrets.QUBE_ANDROID_STORE_PASSWORD }}
+      - name: Verify Android release signature
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs apps/android/app/build/outputs/apk/release/app-release.apk
+          sha256sum apps/android/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: Qube-Android-arm64-preview

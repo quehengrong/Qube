@@ -14,7 +14,7 @@ object Backup {
  }
  suspend fun restore(app:QubeApp,raw:String){
   require(raw.length<=2_000_000){"备份文件过大"};val data=JSONObject(raw);require(data.getInt("version")==2){"备份版本不支持"};val array=data.getJSONArray("reminders");val reminders=(0 until array.length()).map{val j=array.getJSONObject(it);Reminder.fromJson(j).copy(lastNotified=j.optLong("lastNotified"))};for(r in reminders){java.util.UUID.fromString(r.id);require(r.title.isNotBlank()&&r.title.length<=500&&r.advanceMinutes in 0..10080&&r.repeat in listOf("none","daily","weekly")&&r.zone=="Asia/Shanghai")}
-  val records=data.getJSONArray("records");val rows=(0 until records.length()).map{val r=records.getJSONObject(it);val kind=r.getString("kind");require(kind in listOf("note","focus"));val j=JSONObject(r.getString("json"));if(kind=="note")require(j.getString("text").length<=16000);CompanionRecord(r.getString("id"),kind,j.toString(),r.getLong("updatedAt"))}
+  val records=data.getJSONArray("records");val rows=(0 until records.length()).map{val r=records.getJSONObject(it);val kind=r.getString("kind");require(kind in listOf("note","focus"));val j=JSONObject(r.getString("json"));if(kind=="note")require(j.getString("text").length<=16000) else j.put("boot",-1);CompanionRecord(r.getString("id"),kind,j.toString(),r.getLong("updatedAt"))}
   // Merge missing records only: importing a backup never overwrites a newer on-device edit.
   app.db.withTransaction{for(r in reminders)if(app.db.reminders().get(r.id)==null)app.db.reminders().put(r);for(r in rows)if(app.db.companion().get(r.id)==null)app.db.companion().put(r)}
   val profile=data.optJSONObject("profile")
