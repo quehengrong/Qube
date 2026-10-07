@@ -24,9 +24,9 @@ export class Bridge extends EventEmitter {
      if(!authenticated){if(msg.type!=='hello'||!this.matches(msg.payload.token))throw Error('配对失效');if(this.peers.size){ws.close(1008,'One phone at a time');return;}authenticated=true;this.version=msg.payload.capabilities?.includes('v2')?2:msg.payload.version;clearTimeout(timer);this.peers.add(ws);this.emit('connected');return;}
      if(msg.type==='ping'){this.send(ws,{id:msg.id,type:'pong',payload:{}});return;}
      if(msg.type==='hello')return;
-     if(msg.type==='reminder-result'||msg.type==='local-result'||msg.type==='wake'||(msg.type==='feature'&&msg.payload.action==='helper-cancel')){await this.handler?.(msg);return;}
+     if(msg.type==='reminder-result'||msg.type==='local-result'||msg.type==='wake'||msg.type==='phone-events'||(msg.type==='feature'&&msg.payload.action==='helper-cancel')){await this.handler?.(msg);return;}
      if(msg.type==='feature'&&this.version<2)throw Error('请升级手机应用');
-     {if(this.seen.has(msg.id))return;if(busy)throw Error('正在处理上一条指令');this.seen.add(msg.id);if(this.seen.size>1024)this.seen.delete(this.seen.values().next().value!);}
+     {if(this.seen.has(msg.id)&&!(msg.type==='feature'&&msg.payload.action==='note-task'))return;if(busy)throw Error('正在处理上一条指令');this.seen.add(msg.id);if(this.seen.size>1024)this.seen.delete(this.seen.values().next().value!);}
      busy=true;try{await this.handler?.(msg);}finally{busy=false;}
     }catch(error){this.send(ws,{id:randomUUID(),type:'error',payload:{message:error instanceof Error?error.message:'消息无效'}});if(!authenticated)ws.close(1008);}
    });

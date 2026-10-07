@@ -27,3 +27,10 @@ class SpeechApiTest(unittest.TestCase):
             self.assertEqual(response.json(), {'text':'打开夜间模式'})
         with patch.object(server, 'infer', side_effect=RuntimeError('CUDA absent')):
             self.assertEqual(self.client.post('/transcribe',content=bytes(32000),headers=self.headers).status_code,503)
+
+    def test_keyword_conversion_and_validation(self):
+        response = self.client.post('/keywords', json={'phrase':'小机小机'}, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['tokens'], 'x iǎo j ī x iǎo j ī @小机小机')
+        for phrase in ['a', 'a b c', '这是一个过长的唤醒词']:
+            self.assertEqual(self.client.post('/keywords', json={'phrase':phrase}, headers=self.headers).status_code, 400)

@@ -21,7 +21,7 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
-      - run: python3 -m pip install fastapi==0.118.0 httpx==0.28.1
+      - run: python3 -m pip install fastapi==0.118.0 httpx==0.28.1 pypinyin==0.55.0
       - run: python3 -m unittest discover -s services/speech -v
   windows:
     runs-on: windows-latest

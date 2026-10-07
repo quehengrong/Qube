@@ -10,8 +10,9 @@ export type Reminder = z.infer<typeof ReminderSchema>;
 const id = z.string().uuid();
 export const ClientMessageSchema = z.discriminatedUnion('type', [
  z.object({id,type:z.literal('hello'),payload:z.object({token:z.string().min(32),version:z.union([z.literal(1),z.literal(2)]),capabilities:z.array(z.string().max(64)).max(32).optional()})}),
- z.object({id,type:z.literal('feature'),payload:z.object({action:z.enum(['undo','redo','capture','remove-attachment','apply-rewrite','discard-rewrite','helper','helper-cancel','helper-append','clipboard-append','selection-append','metrics','history','clear-history','scene','scene-retry','note-task','wake-config']),text:z.string().max(16000).optional(),target:z.string().max(200).optional(),revision:z.number().int().nonnegative().optional()})}),
+ z.object({id,type:z.literal('feature'),payload:z.object({action:z.enum(['recover-draft','undo','redo','capture','remove-attachment','apply-rewrite','discard-rewrite','helper','helper-cancel','helper-append','clipboard-append','selection-append','metrics','history','clear-history','scene','scene-retry','note-task','wake-config']),text:z.string().max(16000).optional(),target:z.string().max(200).optional(),revision:z.number().int().nonnegative().optional()})}),
  z.object({id,type:z.literal('local-result'),payload:z.object({ok:z.boolean(),message:z.string().max(1000)})}),
+ z.object({id,type:z.literal('phone-events'),payload:z.object({events:z.array(z.object({id:z.string().uuid(),at:z.number().int(),source:z.literal('phone'),action:z.string().max(200),status:z.string().max(100),message:z.string().max(1000)})).max(100)})}),
  z.object({id,type:z.literal('wake'),payload:z.object({})}),
  z.object({id,type:z.literal('text'),payload:z.object({text:z.string().trim().min(1).max(16000)})}),
  z.object({id,type:z.literal('audio'),payload:z.object({pcm:z.string().max(2560000),sampleRate:z.literal(16000)})}),

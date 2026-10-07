@@ -46,20 +46,20 @@ class VoiceService:Service(){
    recorder=AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION,16000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT,size)
    check(recorder?.state==AudioRecord.STATE_INITIALIZED){"麦克风无法初始化"};recorder!!.startRecording()
    val buffer=ShortArray(1600);var capture:ByteArrayOutputStream?=null;var elapsed=0;var silence=0;var speech=false;var suppressUntil=0L
-   while(running){val wanted=app.prefs().getString("candidateTokens",null)?:app.prefs().getString("keywordTokens","x iǎo j ī x iǎo j ī @小机小机")!!;if(wanted!=tokens){val replacement=kws.createStream(wanted);if(replacement.ptr!=0L){stream.release();stream=replacement;tokens=wanted}else{app.prefs().edit().remove("candidateTokens").apply();app.error("新唤醒词无法加载，保留原词")}};val n=recorder!!.read(buffer,0,buffer.size);if(n<=0)continue
-    if(app.speaking){suppressUntil=System.currentTimeMillis()+600;capture=null;app.ui.update{it.copy(listening=false)};kws.reset(stream);continue}
+   while(running){val wanted=app.prefs().getString("candidateTokens",null)?:app.prefs().getString("keywordTokens","x iǎo j ī x iǎo j ī @小机小机")!!;if(wanted!=tokens){val replacement=kws.createStream(wanted);if(replacement.ptr!=0L){stream?.release();stream=replacement;tokens=wanted}else{app.prefs().edit().remove("candidateTokens").apply();app.error("新唤醒词无法加载，保留原词")}};val activeStream=checkNotNull(stream);val n=recorder!!.read(buffer,0,buffer.size);if(n<=0)continue
+    if(app.speaking){suppressUntil=System.currentTimeMillis()+600;capture=null;app.ui.update{it.copy(listening=false)};kws.reset(activeStream);continue}
     if(muted||System.currentTimeMillis()<suppressUntil){manual=false;continue}
     val floats=FloatArray(n){buffer[it]/32768f}
     if(capture==null){
-     stream.acceptWaveform(floats,16000);var detected=false
-     while(kws.isReady(stream)){kws.decode(stream);if(kws.getResult(stream).keyword.isNotBlank()){detected=true;kws.reset(stream);break}}
+     activeStream.acceptWaveform(floats,16000);var detected=false
+     while(kws.isReady(activeStream)){kws.decode(activeStream);if(kws.getResult(activeStream).keyword.isNotBlank()){detected=true;kws.reset(activeStream);break}}
      if(detected&&app.prefs().contains("candidateTokens")){app.ui.update{it.copy(wakeDetected=true,message="新唤醒词识别成功，请确认保存")};continue}
      if(manual||detected){manual=false;if(!app.ui.value.connected){app.say("电脑未连接，已有提醒不受影响");continue};app.bridge.send("wake");capture=ByteArrayOutputStream();elapsed=0;silence=0;speech=false;app.ui.update{it.copy(listening=true,face="listening",message="我在听…")}}
     }else{
      for(index in 0 until n){val sample=buffer[index].toInt();capture.write(sample and 255);capture.write((sample shr 8) and 255)}
      elapsed+=n;val rms=sqrt(floats.sumOf{(it*it).toDouble()}/n);if(rms>0.008){speech=true;silence=0}else silence+=n
      if(elapsed>=960000||(speech&&silence>=19200)||(!speech&&elapsed>=128000)){
-      val bytes=capture.toByteArray();capture=null;kws.reset(stream);app.ui.update{it.copy(listening=false,face="thinking")}
+      val bytes=capture.toByteArray();capture=null;kws.reset(activeStream);app.ui.update{it.copy(listening=false,face="thinking")}
       if(speech)app.bridge.send("audio",JSONObject().put("sampleRate",16000).put("pcm",Base64.encodeToString(bytes,Base64.NO_WRAP)))else app.say("没有听清，请再试一次")
      }
     }

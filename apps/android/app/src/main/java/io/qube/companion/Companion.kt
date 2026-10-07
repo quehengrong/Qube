@@ -26,15 +26,16 @@ data class CompanionRecord(@PrimaryKey val id:String,val kind:String,val json:St
  @Query("DELETE FROM companion WHERE kind='history'") suspend fun clearHistory()
  @Query("DELETE FROM companion WHERE kind IN ('history','receipt') AND (updatedAt<:cutoff OR id IN (SELECT id FROM companion WHERE kind='history' ORDER BY updatedAt DESC LIMIT -1 OFFSET 10000))") suspend fun prune(cutoff:Long)
 }
-class Companion(private val app:QubeApp){
+class CompanionManager(private val app:QubeApp){
  private val lock=Mutex();private val dao get()=app.db.companion()
  private val alarms get()=app.getSystemService(AlarmManager::class.java)
  private fun boot()=Settings.Global.getInt(app.contentResolver,Settings.Global.BOOT_COUNT,0)
  private fun pending(id:String)=PendingIntent.getBroadcast(app,0,Intent(app,FocusReceiver::class.java).setData(Uri.parse("qube://focus/$id")).putExtra("id",id),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
  suspend fun log(action:String,message:String,status:String="success",id:String=UUID.randomUUID().toString()){
   val j=JSONObject().put("id",id).put("at",System.currentTimeMillis()).put("source","phone").put("action",action).put("message",message).put("status",status)
-  dao.put(CompanionRecord(id,"history",j.toString()));dao.prune(System.currentTimeMillis()-30L*86400000)
+  dao.put(CompanionRecord(id,"history",j.toString()));if(app.ui.value.connected)app.bridge.send("phone-events",JSONObject().put("events",org.json.JSONArray().put(j)));dao.prune(System.currentTimeMillis()-30L*86400000)
  }
+ suspend fun syncHistory(){if(app.ui.value.connected){val events=org.json.JSONArray();dao.list("history").filter{JSONObject(it.json).optString("source")=="phone"}.take(100).forEach{events.put(JSONObject(it.json))};app.bridge.send("phone-events",JSONObject().put("events",events))}}
  suspend fun importHistory(events:org.json.JSONArray){for(i in 0 until events.length()){val e=events.getJSONObject(i);dao.put(CompanionRecord(e.getString("id"),"history",e.toString(),e.getLong("at")))};dao.prune(System.currentTimeMillis()-30L*86400000)}
  suspend fun note(text:String,project:String="",id:String=UUID.randomUUID().toString()){
   require(text.isNotBlank()&&text.length<=16000){"请填写 1～16000 字的灵感"};val old=dao.get(id)?.let{JSONObject(it.json)};val j=(old?:JSONObject().put("id",id).put("createdAt",System.currentTimeMillis())).put("text",text).put("project",project).put("archived",false);dao.put(CompanionRecord(id,"note",j.toString()));log("灵感","灵感已保存到手机")

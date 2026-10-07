@@ -8,6 +8,8 @@ export class Store {
  put(key:string,value:unknown){this.db.prepare('INSERT INTO kv VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,JSON.stringify(value));}
  event(action:string,status:string,message:string,target='',requestId:string=randomUUID()){const event:ActionEvent={id:randomUUID(),at:Date.now(),source:'desktop',requestId,action,target,status,message};this.db.prepare('INSERT INTO events VALUES(?,?,?)').run(event.id,event.at,JSON.stringify(event));this.db.prepare('DELETE FROM events WHERE at<? OR id IN (SELECT id FROM events ORDER BY at DESC LIMIT -1 OFFSET 10000)').run(Date.now()-30*86400000);return event;}
  history(limit=100):ActionEvent[]{return this.db.prepare('SELECT json FROM events ORDER BY at DESC,rowid DESC LIMIT ?').all(limit).map(r=>JSON.parse(String(r.json)));}
+ merge(events:Omit<ActionEvent,'target'|'requestId'>[]){for(const e of events)this.db.prepare('INSERT OR IGNORE INTO events VALUES(?,?,?)').run(e.id,e.at,JSON.stringify({...e,target:'phone',requestId:e.id}));}
+ transaction(fn:()=>void){this.db.exec('BEGIN IMMEDIATE');try{fn();this.db.exec('COMMIT');}catch(e){this.db.exec('ROLLBACK');throw e;}}
  clearHistory(){this.db.exec('DELETE FROM events');}
  close(){this.db.close();}
 }

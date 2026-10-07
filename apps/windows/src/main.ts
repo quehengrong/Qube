@@ -25,13 +25,13 @@ const scenes=new SceneRunner(()=>publish());
 function nativePath(){return app.isPackaged?join(process.resourcesPath,'native','Qube.Native.exe'):join(base,'..','native','publish','Qube.Native.exe');}
 const single=app.requestSingleInstanceLock();if(!single)app.quit();
 app.on('second-instance',()=>{win?.show();win?.focus();});
-function state(){return {face,message:lastMessage,connected:bridge?.connected??false,sessions:sessions.list(),draft:draft.state,speech:speech.status,protocol:2,capabilities:['agents','draft-history','attachments','scenes','phone-local','metrics','history'],approvals:sessions.approvals(),scene:scenes.current,metrics,history:store?.history()??[],helper:{running:helperAgent.running,result:helperAgent.result},rewrite};}
+function state(){return {face,message:lastMessage,connected:bridge?.connected??false,sessions:sessions.list(),draft:draft.state,speech:speech.status,protocol:2,savedDrafts:draft.saved(),capabilities:['agents','draft-history','attachments','scenes','phone-local','metrics','history'],approvals:sessions.approvals(),scene:scenes.current,metrics,history:store?.history()??[],helper:{running:helperAgent.running,result:helperAgent.result},rewrite};}
 function publish(){const s=state();win?.webContents.send('state',s);bridge?.broadcast({id:randomUUID(),type:'state',payload:s});store?.put('drafts',draft.export());}
 function feedback(message:string,error=false,id:string=randomUUID()){lastMessage=message;face=error?'error':'success';store?.event('操作反馈',error?'failed':'success',message,draft.state.sessionId??'',id);bridge?.broadcast({id,type:error?'error':'result',payload:{message}});publish();}
 async function textCommand(text:string,id:string){
  const assistant=text.startsWith('助手，')||text.startsWith('助手,');if(assistant)text=text.slice(3);
  if(draft.state.mode==='dictation'&&!assistant&&draft.edit(text)){lastMessage='草稿已修改，可撤销';publish();return;}
- if((draft.state.mode==='command'||assistant)&&await enhancedCommand(text,id))return;
+ if((draft.state.mode==='command'||assistant||/^(截一下|截图|把这段整理|把这段加入草稿|解释这段|翻译一下)/.test(text))&&await enhancedCommand(text,id))return;
  const parsed=intent(text);if(parsed.kind==='mode'){draft.state.mode=parsed.mode;feedback(parsed.mode==='dictation'?'已进入编程听写，请先选择目标会话':'已回到电脑控制模式');return;}
  if(draft.state.mode==='dictation'&&!assistant){
   if(parsed.kind==='submit'){await submit(id,draft.state.sessionId??'',draft.state.revision);return;}
@@ -51,6 +51,7 @@ async function textCommand(text:string,id:string){
 async function submit(id:string,sessionId:string,revision:number){const sent=await draft.submit(id,sessionId,revision,(sid,text,images)=>sessions.submit(sid,text,images),()=>store.put('drafts',draft.export()));if(sent)feedback('已发送到选定会话',false,id);else publish();}
 async function message(m:ClientMessage){
  try{switch(m.type){
+  case 'phone-events':store.merge(m.payload.events);publish();break;
   case 'wake':await capture.foreground().catch(()=>{});break;
   case 'feature':await feature(m.payload,m.id);if(m.payload.action==='note-task')bridge.broadcast({id:m.id,type:'result',payload:{message:'灵感已加入草稿，确认后发送'}});break;
   case 'local-result':{const p=localPending.get(m.id);if(p){clearTimeout(p.timer);localPending.delete(m.id);store.event('手机操作',m.payload.ok?'success':'failed',m.payload.message,'phone',m.id);m.payload.ok?p.resolve(m.payload.message):p.reject(Error(m.payload.message));}break;}
@@ -72,6 +73,7 @@ async function feature(raw:any,id:string){
  const p=z.object({action:z.string(),text:z.string().max(16000).optional(),target:z.string().max(200).optional(),revision:z.number().int().optional()}).parse(raw);
  if(p.revision!==undefined)draft.check(p.revision);
  switch(p.action){
+  case 'recover-draft':draft.recover(p.target??'');break;
   case 'undo':draft.undo();break;case 'redo':draft.redo();break;
   case 'capture':{const sid=draft.state.sessionId,rev=draft.state.revision;const a=await capture.capture(p.target);if(sid!==draft.state.sessionId||rev!==draft.state.revision)throw Error('草稿已变化，请重新截图');draft.attach(a);lastMessage='截图已加入草稿，确认后发送';break;}
   case 'remove-attachment':draft.removeAttachment(p.target??'');break;
@@ -80,7 +82,7 @@ async function feature(raw:any,id:string){
   case 'helper':{const info=targetInfo(),revision=draft.state.revision,sessionId=draft.state.sessionId,before=draft.state.text;const source=p.target==='draft'?before:p.target==='clipboard'?await capture.clipboard():await capture.selected();const instruction=p.text??'用中文解释下面的文本';const task=helperAgent.run(info,source,instruction);publish();const result=await task;if(p.target==='draft')rewrite={text:result,before,revision,sessionId};lastMessage='辅助结果已准备，请查看后决定是否加入草稿';break;}
   case 'apply-rewrite':if(!rewrite||rewrite.sessionId!==draft.state.sessionId)throw Error('修改目标已变化');draft.update(rewrite.text,rewrite.revision);rewrite=null;break;
   case 'discard-rewrite':rewrite=null;break;
-  case 'note-task':if(!p.text?.trim())throw Error('灵感为空');targetInfo();if(store.get('note-task:'+id))return;draft.append(p.text);store.put('drafts',draft.export());store.put('note-task:'+id,true);lastMessage='灵感已加入目标草稿，确认后发送';break;
+  case 'note-task':if(!p.text?.trim())throw Error('灵感为空');targetInfo();if(store.get('note-task:'+id))return;draft.append(p.text);store.transaction(()=>{store.put('drafts',draft.export());store.put('note-task:'+id,true);});lastMessage='灵感已加入目标草稿，确认后发送';break;
   case 'clipboard-append':draft.append(await capture.clipboard());break;
   case 'selection-append':draft.append(await capture.selected());break;
   case 'metrics':metrics=await native(nativePath(),{action:'metrics'});break;
