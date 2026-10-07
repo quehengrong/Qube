@@ -28,3 +28,4 @@ recordings/
 *.key
 .DS_Store
 coverage/
+apps/android/app/src/main/assets/kws/
