@@ -36,7 +36,7 @@ export function parseReminder(input:string,now:number,id:string,defaultAdvance=1
  if(dueAt<=now)return {ok:false,question:'这个时间已经过去，请指定未来时间。'};
  const title=text.replace(/设置|新增|创建|一个|备忘录|备忘|提醒我|提醒/g,'').replace(/^[，,\s]+|[，,\s]+$/g,'').trim();
  if(!title)return {ok:false,question:'请补充要提醒的事项。'};
- const r:Reminder={id,title,dueAt,advanceMinutes,repeat,zone:'Asia/Shanghai',status:'active',revision:0};
+ const r:Reminder={id,title,dueAt,advanceMinutes,repeat,zone:'Asia/Shanghai',status:'active',revision:0,important:false};
  const when=new Date(dueAt).toLocaleString('zh-CN',{timeZone:r.zone,hour12:false});
  return {ok:true,reminder:r,summary:`${when}，${title}，提前${advanceMinutes}分钟提醒${repeat==='daily'?'，每天重复':repeat==='weekly'?'，每周重复':''}。请在手机确认。`};
 }

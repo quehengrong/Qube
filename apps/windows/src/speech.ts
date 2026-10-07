@@ -13,6 +13,7 @@ export class Speech {
  const r=await fetch('http://127.0.0.1:19432/transcribe',{method:'POST',headers:{Authorization:`Bearer ${this.token}`,'Content-Type':'application/octet-stream'},body:bytes,signal:AbortSignal.timeout(120000)}).catch(()=>{throw Error('本地语音服务不可用，请检查 Python 路径、模型和 CUDA 环境');});
  if(!r.ok)throw new Error(`语音识别失败 (${r.status})，请检查模型和 CUDA 环境`);const data=await r.json() as {text:string};return data.text;
  }
+ async keywords(phrase:string){const r=await fetch('http://127.0.0.1:19432/keywords',{method:'POST',headers:{Authorization:`Bearer ${this.token}`,'Content-Type':'application/json'},body:JSON.stringify({phrase}),signal:AbortSignal.timeout(5000)});if(!r.ok)throw Error('唤醒词转换失败，请更新语音服务依赖');return r.json();}
  async unload(){const r=await fetch('http://127.0.0.1:19432/unload',{method:'POST',headers:{Authorization:`Bearer ${this.token}`},signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('释放模型失败');this.status='模型已释放';}
  stop(){this.process?.kill();this.process=null;}
 }

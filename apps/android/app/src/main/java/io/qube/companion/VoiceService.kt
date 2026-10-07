@@ -38,7 +38,7 @@ class VoiceService:Service(){
  }
  private fun recordLoop(){var kws:KeywordSpotter?=null;var stream:OnlineStream?=null
   try{
-   val dir="kws";val keywords=File(filesDir,"keywords.txt");val tokens=app.prefs().getString("keywordTokens","x iǎo j ī x iǎo j ī @小机小机")!!;keywords.writeText(tokens+"\n")
+   val dir="kws";val keywords=File(filesDir,"keywords.txt");var tokens=app.prefs().getString("keywordTokens","x iǎo j ī x iǎo j ī @小机小机")!!;keywords.writeText(tokens+"\n")
    val config=KeywordSpotterConfig(modelConfig=OnlineModelConfig(transducer=OnlineTransducerModelConfig(encoder="$dir/encoder.onnx",decoder="$dir/decoder.onnx",joiner="$dir/joiner.onnx"),tokens="$dir/tokens.txt",numThreads=2,modelType="zipformer2"),keywordsFile="kws/keywords.txt")
    kws=KeywordSpotter(assets,config);stream=kws.createStream(tokens);require(stream.ptr!=0L){"唤醒词无效"}
    val size=AudioRecord.getMinBufferSize(16000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(6400)
@@ -46,14 +46,15 @@ class VoiceService:Service(){
    recorder=AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION,16000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT,size)
    check(recorder?.state==AudioRecord.STATE_INITIALIZED){"麦克风无法初始化"};recorder!!.startRecording()
    val buffer=ShortArray(1600);var capture:ByteArrayOutputStream?=null;var elapsed=0;var silence=0;var speech=false;var suppressUntil=0L
-   while(running){val n=recorder!!.read(buffer,0,buffer.size);if(n<=0)continue
+   while(running){val wanted=app.prefs().getString("candidateTokens",null)?:app.prefs().getString("keywordTokens","x iǎo j ī x iǎo j ī @小机小机")!!;if(wanted!=tokens){val replacement=kws.createStream(wanted);if(replacement.ptr!=0L){stream.release();stream=replacement;tokens=wanted}else{app.prefs().edit().remove("candidateTokens").apply();app.error("新唤醒词无法加载，保留原词")}};val n=recorder!!.read(buffer,0,buffer.size);if(n<=0)continue
     if(app.speaking){suppressUntil=System.currentTimeMillis()+600;capture=null;app.ui.update{it.copy(listening=false)};kws.reset(stream);continue}
     if(muted||System.currentTimeMillis()<suppressUntil){manual=false;continue}
     val floats=FloatArray(n){buffer[it]/32768f}
     if(capture==null){
      stream.acceptWaveform(floats,16000);var detected=false
      while(kws.isReady(stream)){kws.decode(stream);if(kws.getResult(stream).keyword.isNotBlank()){detected=true;kws.reset(stream);break}}
-     if(manual||detected){manual=false;if(!app.ui.value.connected){app.say("电脑未连接，已有提醒不受影响");continue};capture=ByteArrayOutputStream();elapsed=0;silence=0;speech=false;app.ui.update{it.copy(listening=true,face="listening",message="我在听…")}}
+     if(detected&&app.prefs().contains("candidateTokens")){app.ui.update{it.copy(wakeDetected=true,message="新唤醒词识别成功，请确认保存")};continue}
+     if(manual||detected){manual=false;if(!app.ui.value.connected){app.say("电脑未连接，已有提醒不受影响");continue};app.bridge.send("wake");capture=ByteArrayOutputStream();elapsed=0;silence=0;speech=false;app.ui.update{it.copy(listening=true,face="listening",message="我在听…")}}
     }else{
      for(index in 0 until n){val sample=buffer[index].toInt();capture.write(sample and 255);capture.write((sample shr 8) and 255)}
      elapsed+=n;val rms=sqrt(floats.sumOf{(it*it).toDouble()}/n);if(rms>0.008){speech=true;silence=0}else silence+=n

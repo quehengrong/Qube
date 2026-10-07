@@ -66,6 +66,25 @@ async def transcribe(request: Request):
         print(f"Qube inference failed: {type(exc).__name__}", flush=True)
         raise HTTPException(503, "Check model download and CUDA/cuDNN installation") from exc
 
+@app.post("/keywords")
+async def keywords(request: Request):
+    from pypinyin import lazy_pinyin, Style
+    data = await request.json()
+    phrase = data.get("phrase", "")
+    if not isinstance(phrase, str) or not 2 <= len(phrase) <= 6 or not all("\u4e00" <= c <= "\u9fff" for c in phrase):
+        raise HTTPException(400, "Use 2-6 Chinese characters")
+    initials = lazy_pinyin(phrase, style=Style.INITIALS, strict=False)
+    finals = lazy_pinyin(phrase, style=Style.FINALS, strict=False)
+    toned = lazy_pinyin(phrase, style=Style.TONE)
+    parts = []
+    for initial, final, syllable in zip(initials, finals, toned):
+        # KWS uses pinyin initials plus tone-marked finals (not numbered tones).
+        suffix = syllable[len(initial):] if initial else syllable
+        if initial:
+            parts.append(initial)
+        parts.append(suffix)
+    return {"phrase": phrase, "tokens": " ".join(parts) + " @" + phrase}
+
 @app.post("/unload")
 async def unload():
     def release():

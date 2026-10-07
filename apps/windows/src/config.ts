@@ -1,7 +1,10 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
+import {ProjectSchema} from './scenes.js';
 export const ConfigSchema=z.object({
+ projects:z.array(ProjectSchema).default([]),
+ activeProject:z.string().default(''),
  port:z.number().int().min(1024).max(65535).default(19431),
  pythonPath:z.string().default(''),
  defaultAdvance:z.number().int().min(0).max(10080).default(10),

@@ -7,7 +7,7 @@ plugins {
 android {
  namespace = "io.qube.companion"
  compileSdk = 35
- defaultConfig { applicationId = "io.qube.companion"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "0.1.0"; ndk { abiFilters += "arm64-v8a" } }
+ defaultConfig { applicationId = "io.qube.companion"; minSdk = 26; targetSdk = 35; versionCode = 2; versionName = "0.2.0"; ndk { abiFilters += "arm64-v8a" } }
  buildFeatures { compose = true; buildConfig = true }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }

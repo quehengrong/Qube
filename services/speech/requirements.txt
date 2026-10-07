@@ -2,3 +2,4 @@ faster-whisper==1.2.1
 fastapi==0.118.0
 uvicorn==0.37.0
 numpy==2.2.6
+pypinyin==0.55.0

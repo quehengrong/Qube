@@ -8,7 +8,7 @@ import selfsigned from 'selfsigned';
 import { EventEmitter } from 'node:events';
 import {ClientMessageSchema,type ClientMessage,type ServerMessage} from '@qube/protocol';
 export class Bridge extends EventEmitter {
- private server!:Server;private wss!:WebSocketServer;private peers=new Set<WebSocket>();private token='';private fingerprint='';private seen=new Set<string>();
+ private server!:Server;private wss!:WebSocketServer;private peers=new Set<WebSocket>();private token='';private fingerprint='';private seen=new Set<string>();version=1;
  constructor(private dir:string,private port:number){super();}
  async start(){let key:string,cert:string;
   try{key=readFileSync(join(this.dir,'tls.key'),'utf8');cert=readFileSync(join(this.dir,'tls.pem'),'utf8');}
@@ -21,10 +21,12 @@ export class Bridge extends EventEmitter {
   this.wss.on('connection',(ws:WebSocket)=>{let authenticated=false,busy=false;const timer=setTimeout(()=>{if(!authenticated)ws.close(1008,'Authentication required');},5000);
    ws.on('message',async raw=>{
     try{const msg=ClientMessageSchema.parse(JSON.parse(raw.toString()));
-     if(!authenticated){if(msg.type!=='hello'||!this.matches(msg.payload.token))throw Error('配对失效');if(this.peers.size){ws.close(1008,'One phone at a time');return;}authenticated=true;clearTimeout(timer);this.peers.add(ws);this.emit('connected');return;}
+     if(!authenticated){if(msg.type!=='hello'||!this.matches(msg.payload.token))throw Error('配对失效');if(this.peers.size){ws.close(1008,'One phone at a time');return;}authenticated=true;this.version=msg.payload.capabilities?.includes('v2')?2:msg.payload.version;clearTimeout(timer);this.peers.add(ws);this.emit('connected');return;}
      if(msg.type==='ping'){this.send(ws,{id:msg.id,type:'pong',payload:{}});return;}
      if(msg.type==='hello')return;
-     if(msg.type!=='reminder-result'){if(this.seen.has(msg.id))return;if(busy)throw Error('正在处理上一条指令');this.seen.add(msg.id);if(this.seen.size>1024)this.seen.delete(this.seen.values().next().value!);}
+     if(msg.type==='reminder-result'||msg.type==='local-result'||msg.type==='wake'||(msg.type==='feature'&&msg.payload.action==='helper-cancel')){await this.handler?.(msg);return;}
+     if(msg.type==='feature'&&this.version<2)throw Error('请升级手机应用');
+     {if(this.seen.has(msg.id))return;if(busy)throw Error('正在处理上一条指令');this.seen.add(msg.id);if(this.seen.size>1024)this.seen.delete(this.seen.values().next().value!);}
      busy=true;try{await this.handler?.(msg);}finally{busy=false;}
     }catch(error){this.send(ws,{id:randomUUID(),type:'error',payload:{message:error instanceof Error?error.message:'消息无效'}});if(!authenticated)ws.close(1008);}
    });
