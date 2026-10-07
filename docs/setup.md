@@ -9,7 +9,7 @@
 本地语音识别首次配置：
 
 1. 安装 Python 3.11、适用于显卡的 NVIDIA 驱动、CUDA 12 和 cuDNN 9。faster-whisper 的具体运行库要求见其官方 README。
-2. 在仓库 `services/speech` 中运行 `setup.ps1`，把输出的 Python 路径填入 Qube 设置的 `pythonPath`。
+2. 在 Qube 安装目录的 `resources\speech` 中（或仓库 `services/speech` 中）运行 `setup.ps1`，把输出的 Python 路径填入 Qube 设置的 `pythonPath`。
 3. 保存设置，点击“检查语音服务”。第一次识别会下载 `large-v3-turbo` 模型；模型下载需要访问 Hugging Face。可提前在已配置的 Python 环境运行 `from faster_whisper import WhisperModel; WhisperModel('large-v3-turbo', device='cuda', compute_type='int8_float16')` 完成下载。
 4. 如需 CPU 验证，在启动 Qube 前设置环境变量 `QUBE_DEVICE=cpu`、`QUBE_COMPUTE=int8`；这不代表能达到 GPU 延迟目标。
 
