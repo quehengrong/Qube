@@ -26,6 +26,8 @@ class QubeApp:Application(){
  private val speechQueue=java.util.ArrayDeque<SpeechItem>()
  private data class SpeechItem(val id:String,val text:String,val category:String,val done:()->Unit)
  private var active:SpeechItem?=null
+ private val agentAnnouncements=mutableListOf<String>()
+ private val flushAgents=Runnable{val messages=agentAnnouncements.toList();agentAnnouncements.clear();if(messages.isNotEmpty())say(messages.take(3).joinToString("；")+(if(messages.size>3)"；还有 ${messages.size-3} 个会话更新" else ""),"agent")}
  private val handler=android.os.Handler(android.os.Looper.getMainLooper())
  @Volatile var speaking=false
  @Volatile var ttsReady=false
@@ -57,7 +59,7 @@ class QubeApp:Application(){
   handler.postDelayed({finishSpeech(item.id)},30000)
  }
  private fun finishSpeech(id:String?){val item=active?:return;if(item.id!=id)return;tts?.stop();active=null;speaking=false;item.done();nextSpeech()}
- fun notice(id:String,text:String,category:String){val nm=getSystemService(NotificationManager::class.java);val open=PendingIntent.getActivity(this,0,android.content.Intent(this,MainActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE);nm.notify(id.hashCode(),Notification.Builder(this,if(quietNow()&&category !in listOf("important","timer"))"silent" else "reminders-v2").setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Qube").setContentText(text).setContentIntent(open).setAutoCancel(true).build());say(text,category)}
+ fun notice(id:String,text:String,category:String){val nm=getSystemService(NotificationManager::class.java);val open=PendingIntent.getActivity(this,0,android.content.Intent(this,MainActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE);nm.notify(id.hashCode(),Notification.Builder(this,if(quietNow()&&category !in listOf("important","timer"))"silent" else "reminders-v2").setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Qube").setContentText(text).setContentIntent(open).setAutoCancel(true).build());if(category=="agent"){handler.post{agentAnnouncements.add(text);handler.removeCallbacks(flushAgents);handler.postDelayed(flushAgents,600)}}else say(text,category)}
  fun error(text:String){ui.update{it.copy(face="error",message=text)};say(text)}
  fun prefs()=getSharedPreferences("qube",Context.MODE_PRIVATE)
 }

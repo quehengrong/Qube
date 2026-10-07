@@ -62,7 +62,7 @@ class PhoneBridge(private val app:QubeApp){
   "reminder-proposal"->{app.ui.update{it.copy(proposal=p,proposalId=m.getString("id"),page="reminders")};app.say(p.getString("summary"))}
   "reminder-action"->app.ui.update{it.copy(page="reminders")}
   "local-command"->app.scope.launch{val id=m.getString("id");try{val result=app.companion.execute(id,p);send("local-result",JSONObject().put("ok",true).put("message",result),id)}catch(e:Exception){send("local-result",JSONObject().put("ok",false).put("message",e.message?:"手机操作失败"),id)}}
-  "agent-event"->app.scope.launch{val id=m.getString("id");if(app.db.companion().get(id)==null){app.companion.log("Agent",p.getString("name")+"："+p.getString("message"),p.getString("status"),id);app.notice(id,p.getString("name")+"："+p.getString("message"),"agent")}}
+  "agent-event"->app.scope.launch{val id=m.getString("id");if(app.db.companion().get("notice:"+id)==null){app.db.companion().put(CompanionRecord("notice:"+id,"receipt","{}"));p.optJSONObject("record")?.let{app.companion.importHistory(org.json.JSONArray().put(it))};app.notice(id,p.getString("name")+"："+p.getString("message"),"agent")}}
   "wake-config"->{val tokens=p.getString("tokens");val valid=app.assets.open("kws/tokens.txt").bufferedReader().useLines{lines->lines.map{it.substringBeforeLast(' ')}.toSet()};require(tokens.substringBefore('@').trim().split(Regex("\\s+")).all{it in valid}){"此唤醒词包含模型不支持的发音，请换一个词"};app.prefs().edit().putString("candidateTokens",tokens).apply();app.ui.update{it.copy(wakeCandidate=p.toString(),wakeDetected=false,page="settings",message="请开启监听并试喊新唤醒词，再确认保存")}}
 
  }}

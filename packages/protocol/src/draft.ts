@@ -12,7 +12,7 @@ export class DraftController {
  private commit(next:Snapshot){const d=this.doc();d.undo.push(this.snapshot());d.undo=d.undo.slice(-50);d.redo=[];this.restore(next);}
  private restore(s:Snapshot){Object.assign(this.state,structuredClone(s));this.state.revision++;this.doc().current=this.snapshot();}
  saved(){return [...this.documents].filter(([key,d])=>key!==this.key()&&(d.current.text||d.current.attachments.length)).map(([id,d])=>({id,preview:d.current.text.slice(0,100),images:d.current.attachments.length}));}
- recover(id:string){const d=this.documents.get(id);if(!d)throw Error('保存的草稿不存在');if(this.state.text||this.state.attachments.length)throw Error('当前草稿非空，请先保存或清空');this.commit(d.current);this.documents.delete(id);}
+ recover(id:string){if(id===this.key())throw Error('不能恢复到同一个草稿');const d=this.documents.get(id);if(!d)throw Error('保存的草稿不存在');if(this.state.text||this.state.attachments.length)throw Error('当前草稿非空，请先保存或清空');this.commit(d.current);this.documents.delete(id);}
  select(id:string){this.doc().current=this.snapshot();const inbox=this.state.sessionId===null?this.snapshot():null;this.state.sessionId=id;const d=this.doc();if(inbox&&(inbox.text||inbox.attachments.length)&&!d.current.text&&!d.current.attachments.length){d.current=inbox;this.documents.set('inbox',{current:empty(),undo:[],redo:[]});}this.restore(d.current);this.state.confirmedConnection=true;}
  disconnect(){this.state.confirmedConnection=false;this.state.revision++;}
  check(revision:number){if(revision!==this.state.revision)throw new Error('草稿已变化，请刷新后重试');}
