@@ -29,3 +29,11 @@ recordings/
 .DS_Store
 coverage/
 apps/android/app/src/main/assets/kws/
+
+# local build outputs and pairing credentials from source-mode runs
+apps/windows/native/obj/
+apps/windows/native/bin/
+apps/windows/native/publish/
+pairing.json
+pairing-qr.png
+phone-screen.png
